@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Disc Golf Wind Guide",
-    "slug": "frisbee-wind",
+    "slug": "disc-golf-wind-helper",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
@@ -11,13 +11,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.frisbeewind.app"
+      "bundleIdentifier": "com.discgolfwindguide.app"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#030712"
       },
-      "package": "com.frisbeewind.app"
+      "package": "com.discgolfwindguide.app"
     }
   }
 }

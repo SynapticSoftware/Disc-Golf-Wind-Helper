@@ -1,12 +1,27 @@
 import { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { WIND_DIRECTIONS, SHOT_SHAPES, TERRAIN_TYPES, getRecommendation, discColors } from '@frisbee-wind/core';
+import {
+  DEFAULT_THROW_PERSPECTIVE,
+  TERRAIN_TYPES,
+  discColors,
+  getRecommendation,
+  getShotShapes,
+  getWindDirections,
+} from '@frisbee-wind/core';
 
-export default function SuggesterTab() {
+type SuggesterTabProps = {
+  perspective?: string;
+};
+
+export default function SuggesterTab({
+  perspective = DEFAULT_THROW_PERSPECTIVE,
+}: SuggesterTabProps) {
   const [selectedShot, setSelectedShot] = useState<string | null>(null);
   const [selectedTerrain, setSelectedTerrain] = useState<string | null>(null);
   const [selectedWind, setSelectedWind] = useState<string | null>(null);
-  const windOptions = WIND_DIRECTIONS.filter((wind) => wind.id !== 'no_wind');
+  const shotOptions = getShotShapes(perspective);
+  const windDirections = getWindDirections(perspective);
+  const windOptions = windDirections.filter((wind) => wind.id !== 'no_wind');
   const effectiveWind = selectedWind || 'no_wind';
 
   const selectedRecommendation = selectedShot && selectedTerrain
@@ -14,6 +29,7 @@ export default function SuggesterTab() {
       shotId: selectedShot,
       terrainId: selectedTerrain,
       windId: effectiveWind,
+      perspective,
     })
     : null;
 
@@ -24,7 +40,7 @@ export default function SuggesterTab() {
       {/* Shot Shape */}
       <Text className="text-xs text-gray-500 uppercase tracking-widest mb-2">1. What shot shape do you need?</Text>
       <View className="flex-row flex-wrap gap-2 mb-5">
-        {SHOT_SHAPES.map((shot) => {
+        {shotOptions.map((shot) => {
           const active = selectedShot === shot.id;
           return (
             <Pressable

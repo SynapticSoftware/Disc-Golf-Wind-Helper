@@ -164,6 +164,97 @@ const SHOT_ID_TO_SOURCE = Object.fromEntries(
   SHOT_CONFIG.map((entry) => [entry.id, entry.sourceKey])
 );
 
+const WIND_CONFIG_BY_ID = Object.fromEntries(
+  WIND_CONFIG.map((entry) => [entry.id, entry])
+);
+
+const SHOT_CONFIG_BY_ID = Object.fromEntries(
+  SHOT_CONFIG.map((entry) => [entry.id, entry])
+);
+
+const MIRRORED_WIND_ID = {
+  left_to_right: "right_to_left",
+  right_to_left: "left_to_right",
+  headwind_left_to_right: "headwind_right_to_left",
+  headwind_right_to_left: "headwind_left_to_right",
+  tailwind_left_to_right: "tailwind_right_to_left",
+  tailwind_right_to_left: "tailwind_left_to_right",
+};
+
+const MIRRORED_SHOT_ID = {
+  short_left: "short_right",
+  short_right: "short_left",
+  long_left: "long_right",
+  long_right: "long_left",
+};
+
+const TOKEN_SWAP_PAIRS = [
+  ["right-to-left", "left-to-right"],
+  ["Right-to-left", "Left-to-right"],
+  ["RIGHT-TO-LEFT", "LEFT-TO-RIGHT"],
+  ["right to left", "left to right"],
+  ["Right to left", "Left to right"],
+  ["RIGHT TO LEFT", "LEFT TO RIGHT"],
+  ["R-to-L", "L-to-R"],
+  ["r-to-l", "l-to-r"],
+  ["R→L", "L→R"],
+  ["RHBH", "RHFH"],
+  ["LHBH", "LHFH"],
+  ["Right-Hand Backhand", "Right-Hand Forehand"],
+  ["Left-Hand Backhand", "Left-Hand Forehand"],
+  ["right-hand backhand", "right-hand forehand"],
+  ["left-hand backhand", "left-hand forehand"],
+  ["left", "right"],
+  ["Left", "Right"],
+  ["LEFT", "RIGHT"],
+];
+
+const TOKEN_SWAP_MAP = new Map(
+  TOKEN_SWAP_PAIRS.flatMap(([tokenA, tokenB]) => [
+    [tokenA, tokenB],
+    [tokenB, tokenA],
+  ])
+);
+
+const TOKEN_SWAP_MATCHER = new RegExp(
+  Array.from(TOKEN_SWAP_MAP.keys())
+    .sort((tokenA, tokenB) => tokenB.length - tokenA.length)
+    .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|"),
+  "g"
+);
+
+export const DEFAULT_THROW_PERSPECTIVE = "rhbh_lhfh";
+export const ALTERNATE_THROW_PERSPECTIVE = "rhfh_lhbh";
+
+const THROW_PERSPECTIVE_SET = new Set([
+  DEFAULT_THROW_PERSPECTIVE,
+  ALTERNATE_THROW_PERSPECTIVE,
+]);
+
+export const THROW_PERSPECTIVES = [
+  {
+    id: DEFAULT_THROW_PERSPECTIVE,
+    label: "RHBH / LHFH",
+    desc: "Default orientation",
+  },
+  {
+    id: ALTERNATE_THROW_PERSPECTIVE,
+    label: "RHFH / LHBH",
+    desc: "Mirrored orientation",
+  },
+];
+
+/**
+ * Check whether a value is a supported throw perspective id.
+ *
+ * @param {string} value Candidate perspective id.
+ * @returns {boolean} True when value matches a supported perspective.
+ */
+export function isThrowPerspective(value) {
+  return THROW_PERSPECTIVE_SET.has(value);
+}
+
 const DISC_ORDER = {
   understable: 0,
   stable: 1,
@@ -199,10 +290,151 @@ export const SHOT_SHAPES = SHOT_CONFIG.map(({ id, label, icon, desc }) => ({
 
 export const windGuideMeta = recommendationsSource?.meta || {};
 
+function mirrorDirectionalText(text) {
+  if (typeof text !== "string" || text.length === 0) {
+    return text;
+  }
+
+  const replacements = [];
+  let replacementIndex = 0;
+  const placeholderText = text.replace(TOKEN_SWAP_MATCHER, (match) => {
+    const placeholder = `__swap_token_${replacementIndex}__`;
+    replacementIndex += 1;
+    replacements.push({
+      placeholder,
+      value: TOKEN_SWAP_MAP.get(match) || match,
+    });
+    return placeholder;
+  });
+
+  return replacements.reduce(
+    (output, replacement) =>
+      output.split(replacement.placeholder).join(replacement.value),
+    placeholderText
+  );
+}
+
 function throwAppError(functionName, userMessage, debugContext) {
   const err = new AppError(userMessage, debugContext);
   console.error(`[${functionName}]`, err);
   throw err;
+}
+
+function toThrowPerspective(functionName, perspective) {
+  const normalizedPerspective = perspective || DEFAULT_THROW_PERSPECTIVE;
+  if (!THROW_PERSPECTIVE_SET.has(normalizedPerspective)) {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `Unknown throw perspective: ${normalizedPerspective}`
+    );
+  }
+
+  return normalizedPerspective;
+}
+
+function shouldMirrorPerspective(perspective) {
+  return perspective === ALTERNATE_THROW_PERSPECTIVE;
+}
+
+function mirrorDirectionalId(id, mirrorMap) {
+  return mirrorMap[id] || id;
+}
+
+function toSourceDirectionalId(id, mirrorMap, perspective) {
+  if (!shouldMirrorPerspective(perspective)) {
+    return id;
+  }
+  return mirrorDirectionalId(id, mirrorMap);
+}
+
+function toDisplayDirectionalId(id, mirrorMap, perspective) {
+  if (!shouldMirrorPerspective(perspective)) {
+    return id;
+  }
+  return mirrorDirectionalId(id, mirrorMap);
+}
+
+function mirrorTextForPerspective(value, perspective) {
+  if (!shouldMirrorPerspective(perspective)) {
+    return value;
+  }
+  return mirrorDirectionalText(value);
+}
+
+function getDirectionalOptionByPerspective(option, byId, mirrorMap, perspective) {
+  if (!shouldMirrorPerspective(perspective)) {
+    return option;
+  }
+
+  const mirroredOption = byId[mirrorDirectionalId(option.id, mirrorMap)] || option;
+  return {
+    id: option.id,
+    label: mirroredOption.label,
+    icon: mirroredOption.icon,
+    desc: mirroredOption.desc,
+  };
+}
+
+/**
+ * Get wind direction options for a throw perspective.
+ *
+ * @param {string} [perspective='rhbh_lhfh'] Throw perspective.
+ * @returns {{id: string, label: string, icon: string, desc: string}[]} Wind options.
+ */
+export function getWindDirections(perspective = DEFAULT_THROW_PERSPECTIVE) {
+  const selectedPerspective = toThrowPerspective(
+    "getWindDirections",
+    perspective
+  );
+  return WIND_DIRECTIONS.map((wind) =>
+    getDirectionalOptionByPerspective(
+      wind,
+      WIND_CONFIG_BY_ID,
+      MIRRORED_WIND_ID,
+      selectedPerspective
+    )
+  );
+}
+
+/**
+ * Get shot shape options for a throw perspective.
+ *
+ * @param {string} [perspective='rhbh_lhfh'] Throw perspective.
+ * @returns {{id: string, label: string, icon: string, desc: string}[]} Shot options.
+ */
+export function getShotShapes(perspective = DEFAULT_THROW_PERSPECTIVE) {
+  const selectedPerspective = toThrowPerspective("getShotShapes", perspective);
+  return SHOT_SHAPES.map((shot) =>
+    getDirectionalOptionByPerspective(
+      shot,
+      SHOT_CONFIG_BY_ID,
+      MIRRORED_SHOT_ID,
+      selectedPerspective
+    )
+  );
+}
+
+/**
+ * Get metadata text for a throw perspective.
+ *
+ * @param {string} [perspective='rhbh_lhfh'] Throw perspective.
+ * @returns {object} Mirrored metadata when required by perspective.
+ */
+export function getWindGuideMeta(perspective = DEFAULT_THROW_PERSPECTIVE) {
+  const selectedPerspective = toThrowPerspective("getWindGuideMeta", perspective);
+  if (!shouldMirrorPerspective(selectedPerspective)) {
+    return windGuideMeta;
+  }
+
+  return {
+    ...windGuideMeta,
+    perspective: mirrorTextForPerspective(
+      windGuideMeta?.perspective || "",
+      selectedPerspective
+    ),
+    note: mirrorTextForPerspective(windGuideMeta?.note || "", selectedPerspective),
+  };
 }
 
 function ensureArray(functionName, value, name) {
@@ -590,20 +822,76 @@ function toSourceReleaseAngle(functionName, releaseAngle) {
   return normalizedReleaseAngle;
 }
 
+function toSourceWindId(selectedWindId, perspective) {
+  return toSourceDirectionalId(selectedWindId, MIRRORED_WIND_ID, perspective);
+}
+
+function toSourceShotId(selectedShotId, perspective) {
+  return toSourceDirectionalId(selectedShotId, MIRRORED_SHOT_ID, perspective);
+}
+
+function toDisplayWindId(sourceWindId, perspective) {
+  return toDisplayDirectionalId(sourceWindId, MIRRORED_WIND_ID, perspective);
+}
+
+function toDisplayShotId(sourceShotId, perspective) {
+  return toDisplayDirectionalId(sourceShotId, MIRRORED_SHOT_ID, perspective);
+}
+
+function toDisplayFactorValue(dimension, sourceValue, perspective) {
+  if (dimension === "wind") {
+    return toDisplayWindId(sourceValue, perspective);
+  }
+  if (dimension === "shot") {
+    return toDisplayShotId(sourceValue, perspective);
+  }
+  return sourceValue;
+}
+
+function toValueOrderMapForPerspective(dimension, perspective) {
+  if (!shouldMirrorPerspective(perspective)) {
+    return dimension === "wind"
+      ? WIND_ORDER
+      : dimension === "terrain"
+      ? TERRAIN_ORDER
+      : dimension === "shot"
+      ? SHOT_ORDER
+      : RELEASE_ANGLE_ORDER;
+  }
+
+  if (dimension === "wind") {
+    return Object.fromEntries(
+      WIND_DIRECTIONS.map((item, index) => [toDisplayWindId(item.id, perspective), index])
+    );
+  }
+
+  if (dimension === "shot") {
+    return Object.fromEntries(
+      SHOT_SHAPES.map((item, index) => [toDisplayShotId(item.id, perspective), index])
+    );
+  }
+
+  return dimension === "terrain" ? TERRAIN_ORDER : RELEASE_ANGLE_ORDER;
+}
+
 function buildConditionKey({ wind, terrain, shot, releaseAngle }) {
   return `${wind}|${terrain}|${shot}|${releaseAngle}`;
 }
 
-function normalizeRecommendation(shotId, condition) {
+function normalizeRecommendation(shotId, condition, perspective) {
+  const recommendationTips = condition.recommendation.tips.map((tip) =>
+    mirrorTextForPerspective(tip, perspective)
+  );
+
   return {
     shotId,
     disc: condition.recommendation.disc,
     category: condition.recommendation.category,
     angle: condition.recommendation.angle,
-    summary: condition.recommendation.summary,
-    aimNote: condition.recommendation.aimPoint,
-    tips: condition.recommendation.tips,
-    tip: condition.recommendation.tips[0] || "",
+    summary: mirrorTextForPerspective(condition.recommendation.summary, perspective),
+    aimNote: mirrorTextForPerspective(condition.recommendation.aimPoint, perspective),
+    tips: recommendationTips,
+    tip: recommendationTips[0] || "",
     confidence: "best",
   };
 }
@@ -636,15 +924,8 @@ function collectMatchedFactorSets(conditions) {
   return matched;
 }
 
-function toFactorExplanations(dimension, matchedValues) {
-  const valueOrder =
-    dimension === "wind"
-      ? WIND_ORDER
-      : dimension === "terrain"
-      ? TERRAIN_ORDER
-      : dimension === "shot"
-      ? SHOT_ORDER
-      : RELEASE_ANGLE_ORDER;
+function toFactorExplanations(dimension, matchedValues, perspective) {
+  const valueOrder = toValueOrderMapForPerspective(dimension, perspective);
 
   const orderedValues = sortValues(Array.from(matchedValues), valueOrder);
   const byText = new Map();
@@ -660,15 +941,16 @@ function toFactorExplanations(dimension, matchedValues) {
     }
 
     const existing = byText.get(support.explanation);
+    const displayValue = toDisplayFactorValue(dimension, value, perspective);
     if (!existing) {
       byText.set(support.explanation, {
-        text: support.explanation,
-        matchedValues: [value],
+        text: mirrorTextForPerspective(support.explanation, perspective),
+        matchedValues: [displayValue],
       });
       continue;
     }
 
-    existing.matchedValues.push(value);
+    existing.matchedValues.push(displayValue);
   }
 
   return Array.from(byText.values()).map((entry) => ({
@@ -718,10 +1000,15 @@ function toFacetFilter(functionName, discType, stability) {
   };
 }
 
-function toDimensionFilter(functionName, params) {
+function toDimensionFilter(functionName, params, perspective) {
   return {
     wind: params.windId
-      ? toSourceValue(functionName, "wind", params.windId, WIND_ID_TO_SOURCE)
+      ? toSourceValue(
+          functionName,
+          "wind",
+          toSourceWindId(params.windId, perspective),
+          WIND_ID_TO_SOURCE
+        )
       : null,
     terrain: params.terrainId
       ? toSourceValue(
@@ -732,7 +1019,12 @@ function toDimensionFilter(functionName, params) {
         )
       : null,
     shot: params.shotId
-      ? toSourceValue(functionName, "shot", params.shotId, SHOT_ID_TO_SOURCE)
+      ? toSourceValue(
+          functionName,
+          "shot",
+          toSourceShotId(params.shotId, perspective),
+          SHOT_ID_TO_SOURCE
+        )
       : null,
     releaseAngle: params.releaseAngle
       ? toSourceReleaseAngle(functionName, params.releaseAngle)
@@ -740,15 +1032,18 @@ function toDimensionFilter(functionName, params) {
   };
 }
 
-function toSituationalSummaries(matchedConditions) {
+function toSituationalSummaries(matchedConditions, perspective) {
+  const windOrderByPerspective = toValueOrderMapForPerspective("wind", perspective);
+  const shotOrderByPerspective = toValueOrderMapForPerspective("shot", perspective);
   const summaryMap = new Map();
 
   for (const condition of matchedConditions) {
-    const summaryText = ensureString(
+    const sourceSummaryText = ensureString(
       "toSituationalSummaries",
       condition.recommendation.summary,
       `${condition.id}.recommendation.summary`
     );
+    const summaryText = mirrorTextForPerspective(sourceSummaryText, perspective);
 
     const existing = summaryMap.get(summaryText);
     if (!existing) {
@@ -756,9 +1051,9 @@ function toSituationalSummaries(matchedConditions) {
         summary: summaryText,
         conditionCount: 1,
         matchedFactors: {
-          wind: new Set([condition.wind]),
+          wind: new Set([toDisplayWindId(condition.wind, perspective)]),
           terrain: new Set([condition.terrain]),
-          shot: new Set([condition.shot]),
+          shot: new Set([toDisplayShotId(condition.shot, perspective)]),
           releaseAngle: new Set([condition.releaseAngle]),
         },
       });
@@ -766,9 +1061,9 @@ function toSituationalSummaries(matchedConditions) {
     }
 
     existing.conditionCount += 1;
-    existing.matchedFactors.wind.add(condition.wind);
+    existing.matchedFactors.wind.add(toDisplayWindId(condition.wind, perspective));
     existing.matchedFactors.terrain.add(condition.terrain);
-    existing.matchedFactors.shot.add(condition.shot);
+    existing.matchedFactors.shot.add(toDisplayShotId(condition.shot, perspective));
     existing.matchedFactors.releaseAngle.add(condition.releaseAngle);
   }
 
@@ -777,12 +1072,12 @@ function toSituationalSummaries(matchedConditions) {
       summary: entry.summary,
       conditionCount: entry.conditionCount,
       matchedFactors: {
-        wind: sortValues(Array.from(entry.matchedFactors.wind), WIND_ORDER),
+        wind: sortValues(Array.from(entry.matchedFactors.wind), windOrderByPerspective),
         terrain: sortValues(
           Array.from(entry.matchedFactors.terrain),
           TERRAIN_ORDER
         ),
-        shot: sortValues(Array.from(entry.matchedFactors.shot), SHOT_ORDER),
+        shot: sortValues(Array.from(entry.matchedFactors.shot), shotOrderByPerspective),
         releaseAngle: sortValues(
           Array.from(entry.matchedFactors.releaseAngle),
           RELEASE_ANGLE_ORDER
@@ -797,8 +1092,10 @@ function toSituationalSummaries(matchedConditions) {
     });
 }
 
-function toCardTips(profile, matchedFactorSets) {
-  const tips = new Set(profile.baseTips);
+function toCardTips(profile, matchedFactorSets, perspective) {
+  const tips = new Set(
+    profile.baseTips.map((tip) => mirrorTextForPerspective(tip, perspective))
+  );
 
   for (const dimension of ["wind", "terrain", "shot", "releaseAngle"]) {
     for (const value of matchedFactorSets[dimension]) {
@@ -810,7 +1107,7 @@ function toCardTips(profile, matchedFactorSets) {
           `Missing factor support for ${dimension}.${value}`
         );
       }
-      tips.add(support.tip);
+      tips.add(mirrorTextForPerspective(support.tip, perspective));
     }
   }
 
@@ -825,6 +1122,7 @@ function toCardTips(profile, matchedFactorSets) {
  * @param {string} params.terrainId Selected terrain id from TERRAIN_TYPES.
  * @param {string} params.shotId Selected shot id from SHOT_SHAPES.
  * @param {string} [params.releaseAngle] Optional release angle. Defaults to 'flat'.
+ * @param {string} [params.perspective='rhbh_lhfh'] Throw perspective id.
  * @returns {object | null} Normalized suggester recommendation or null if unavailable.
  */
 export function getRecommendation({
@@ -832,16 +1130,28 @@ export function getRecommendation({
   terrainId,
   shotId,
   releaseAngle,
+  perspective = DEFAULT_THROW_PERSPECTIVE,
 }) {
   const functionName = "getRecommendation";
-  const wind = toSourceValue(functionName, "wind", windId, WIND_ID_TO_SOURCE);
+  const selectedPerspective = toThrowPerspective(functionName, perspective);
+  const wind = toSourceValue(
+    functionName,
+    "wind",
+    toSourceWindId(windId, selectedPerspective),
+    WIND_ID_TO_SOURCE
+  );
   const terrain = toSourceValue(
     functionName,
     "terrain",
     terrainId,
     TERRAIN_ID_TO_SOURCE
   );
-  const shot = toSourceValue(functionName, "shot", shotId, SHOT_ID_TO_SOURCE);
+  const shot = toSourceValue(
+    functionName,
+    "shot",
+    toSourceShotId(shotId, selectedPerspective),
+    SHOT_ID_TO_SOURCE
+  );
   const selectedReleaseAngle = toSourceReleaseAngle(functionName, releaseAngle);
 
   const key = buildConditionKey({
@@ -856,7 +1166,7 @@ export function getRecommendation({
     return null;
   }
 
-  return normalizeRecommendation(shotId, condition);
+  return normalizeRecommendation(shotId, condition, selectedPerspective);
 }
 
 /**
@@ -866,21 +1176,30 @@ export function getRecommendation({
  * @param {string} params.windId Selected wind id from WIND_DIRECTIONS.
  * @param {string} params.terrainId Selected terrain id from TERRAIN_TYPES.
  * @param {string} [params.releaseAngle] Optional release angle. Defaults to 'flat'.
+ * @param {string} [params.perspective='rhbh_lhfh'] Throw perspective id.
  * @returns {object[]} Ordered suggester recommendations.
  */
 export function getRecommendationsForCondition({
   windId,
   terrainId,
   releaseAngle,
+  perspective = DEFAULT_THROW_PERSPECTIVE,
 }) {
-  return SHOT_SHAPES.map((shot) =>
+  const selectedPerspective = toThrowPerspective(
+    "getRecommendationsForCondition",
+    perspective
+  );
+  return getShotShapes(selectedPerspective)
+    .map((shot) =>
     getRecommendation({
       windId,
       terrainId,
       shotId: shot.id,
       releaseAngle,
+      perspective: selectedPerspective,
     })
-  ).filter(Boolean);
+  )
+    .filter(Boolean);
 }
 
 /**
@@ -893,6 +1212,7 @@ export function getRecommendationsForCondition({
  * @param {string | null} [params.releaseAngle=null] Optional release angle: 'hyzer' | 'flat' | 'anhyzer'.
  * @param {string | null} [params.discType=null] Optional disc type/category: 'driver' | 'mid' | 'putter'.
  * @param {string | null} [params.stability=null] Optional stability: 'understable' | 'stable' | 'overstable'.
+ * @param {string} [params.perspective='rhbh_lhfh'] Throw perspective id.
  * @returns {object[]} Reference cards for the selected conditions.
  */
 export function getReferenceCardsForCondition({
@@ -902,14 +1222,16 @@ export function getReferenceCardsForCondition({
   releaseAngle = null,
   discType = null,
   stability = null,
+  perspective = DEFAULT_THROW_PERSPECTIVE,
 }) {
   const functionName = "getReferenceCardsForCondition";
+  const selectedPerspective = toThrowPerspective(functionName, perspective);
   const selectedFilter = toDimensionFilter(functionName, {
     windId,
     terrainId,
     shotId,
     releaseAngle,
-  });
+  }, selectedPerspective);
   const facetFilter = toFacetFilter(functionName, discType, stability);
   const matchedConditions = getMatchedConditions(selectedFilter);
 
@@ -933,18 +1255,37 @@ export function getReferenceCardsForCondition({
     profileId: profile.profileId,
     disc: profile.disc,
     category: profile.category,
-    baseExplanation: profile.baseExplanation,
+    baseExplanation: mirrorTextForPerspective(
+      profile.baseExplanation,
+      selectedPerspective
+    ),
     factorExplanations: {
-      wind: toFactorExplanations("wind", matchedFactorSets.wind),
-      terrain: toFactorExplanations("terrain", matchedFactorSets.terrain),
-      shot: toFactorExplanations("shot", matchedFactorSets.shot),
+      wind: toFactorExplanations(
+        "wind",
+        matchedFactorSets.wind,
+        selectedPerspective
+      ),
+      terrain: toFactorExplanations(
+        "terrain",
+        matchedFactorSets.terrain,
+        selectedPerspective
+      ),
+      shot: toFactorExplanations(
+        "shot",
+        matchedFactorSets.shot,
+        selectedPerspective
+      ),
       releaseAngle: toFactorExplanations(
         "releaseAngle",
-        matchedFactorSets.releaseAngle
+        matchedFactorSets.releaseAngle,
+        selectedPerspective
       ),
     },
-    tips: toCardTips(profile, matchedFactorSets),
-    situationalSummaries: toSituationalSummaries(matchedConditions),
+    tips: toCardTips(profile, matchedFactorSets, selectedPerspective),
+    situationalSummaries: toSituationalSummaries(
+      matchedConditions,
+      selectedPerspective
+    ),
   }));
 
   cards.sort((a, b) => {
@@ -965,5 +1306,10 @@ export function getReferenceCardsForCondition({
  * Internal helper utilities exposed for unit testing.
  */
 export const __referenceInternals = {
+  mirrorDirectionalText,
+  toSourceWindId,
+  toSourceShotId,
+  toDisplayWindId,
+  toDisplayShotId,
   validateNormalizedSource,
 };

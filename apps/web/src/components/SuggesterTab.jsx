@@ -1,11 +1,22 @@
 import { useState } from 'react';
-import { WIND_DIRECTIONS, SHOT_SHAPES, TERRAIN_TYPES, getRecommendation, discColors } from '@frisbee-wind/core';
+import {
+  DEFAULT_THROW_PERSPECTIVE,
+  TERRAIN_TYPES,
+  discColors,
+  getRecommendation,
+  getShotShapes,
+  getWindDirections,
+} from '@frisbee-wind/core';
 
-export default function SuggesterTab() {
+export default function SuggesterTab({
+  perspective = DEFAULT_THROW_PERSPECTIVE,
+}) {
   const [selectedShot, setSelectedShot] = useState(null);
   const [selectedTerrain, setSelectedTerrain] = useState(null);
   const [selectedWind, setSelectedWind] = useState(null);
-  const windOptions = WIND_DIRECTIONS.filter((wind) => wind.id !== 'no_wind');
+  const shotOptions = getShotShapes(perspective);
+  const windDirections = getWindDirections(perspective);
+  const windOptions = windDirections.filter((wind) => wind.id !== 'no_wind');
   const effectiveWind = selectedWind || 'no_wind';
 
   const selectedRecommendation = selectedShot && selectedTerrain
@@ -13,6 +24,7 @@ export default function SuggesterTab() {
       shotId: selectedShot,
       terrainId: selectedTerrain,
       windId: effectiveWind,
+      perspective,
     })
     : null;
 
@@ -24,7 +36,7 @@ export default function SuggesterTab() {
       <div className="mb-5">
         <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">1. What shot shape do you need?</div>
         <div className="grid grid-cols-4 gap-2">
-          {SHOT_SHAPES.map((shot) => (
+          {shotOptions.map((shot) => (
             <button key={shot.id} onClick={() => setSelectedShot(shot.id)}
               aria-label={`Select shot shape ${shot.label}`}
               className={`py-3 px-2 rounded border text-center transition-all flex flex-col items-center justify-center gap-1 ${

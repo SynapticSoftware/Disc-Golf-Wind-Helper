@@ -1,7 +1,16 @@
 import { useState } from 'react';
-import { WIND_DIRECTIONS, TERRAIN_TYPES, SHOT_SHAPES, getReferenceCardsForCondition, discColors } from '@frisbee-wind/core';
+import {
+  DEFAULT_THROW_PERSPECTIVE,
+  TERRAIN_TYPES,
+  discColors,
+  getReferenceCardsForCondition,
+  getShotShapes,
+  getWindDirections,
+} from '@frisbee-wind/core';
 
-export default function ReferenceTab() {
+export default function ReferenceTab({
+  perspective = DEFAULT_THROW_PERSPECTIVE,
+}) {
   const [selectedTerrain, setSelectedTerrain] = useState(null);
   const [selectedWind, setSelectedWind] = useState(null);
   const [selectedShot, setSelectedShot] = useState(null);
@@ -12,12 +21,14 @@ export default function ReferenceTab() {
   const discTypeOptions = ['driver', 'mid', 'putter'];
   const stabilityOptions = ['understable', 'stable', 'overstable'];
   const releaseAngleOptions = ['hyzer', 'flat', 'anhyzer'];
-  const windOptions = WIND_DIRECTIONS.filter((wind) => wind.id !== 'no_wind');
+  const shotOptions = getShotShapes(perspective);
+  const windDirections = getWindDirections(perspective);
+  const windOptions = windDirections.filter((wind) => wind.id !== 'no_wind');
   const effectiveWind = selectedWind || 'no_wind';
 
-  const windLabelById = Object.fromEntries(WIND_DIRECTIONS.map((wind) => [wind.id, wind.label]));
+  const windLabelById = Object.fromEntries(windDirections.map((wind) => [wind.id, wind.label]));
   const terrainLabelById = Object.fromEntries(TERRAIN_TYPES.map((terrain) => [terrain.id, terrain.label]));
-  const shotLabelById = Object.fromEntries(SHOT_SHAPES.map((shot) => [shot.id, shot.label]));
+  const shotLabelById = Object.fromEntries(shotOptions.map((shot) => [shot.id, shot.label]));
   const releaseAngleLabelById = Object.fromEntries(releaseAngleOptions.map((angle) => [angle, angle]));
 
   const formatWindValues = (values) => values
@@ -31,6 +42,7 @@ export default function ReferenceTab() {
     releaseAngle: selectedReleaseAngle,
     discType: selectedDiscType,
     stability: selectedStability,
+    perspective,
   });
 
   return (
@@ -59,7 +71,7 @@ export default function ReferenceTab() {
       <div className="mb-4">
         <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">Shot Shape</div>
         <div className="grid grid-cols-4 gap-2">
-          {SHOT_SHAPES.map((shot) => (
+          {shotOptions.map((shot) => (
             <button
               key={shot.id}
               onClick={() => setSelectedShot((prev) => prev === shot.id ? null : shot.id)}

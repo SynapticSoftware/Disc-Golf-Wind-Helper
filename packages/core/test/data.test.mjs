@@ -3,9 +3,12 @@ import assert from "node:assert/strict";
 import guide from "../../../disc-golf-wind-guide.json" with { type: "json" };
 import normalizedRecommendations from "../data/recommendations.json" with { type: "json" };
 import {
+  ALTERNATE_THROW_PERSPECTIVE,
   __referenceInternals,
   getRecommendation,
+  getShotShapes,
   getReferenceCardsForCondition,
+  getWindDirections,
 } from "../src/data.js";
 import { AppError } from "../src/errors.js";
 
@@ -177,4 +180,129 @@ test("situational summaries are derived from matched filter conditions for every
     assert.equal(card.situationalSummaries.length, 1);
     assert.equal(card.situationalSummaries[0].conditionCount, 1);
   }
+});
+
+test("perspective mirror helpers swap directional wind and shot ids", () => {
+  assert.equal(
+    __referenceInternals.toSourceWindId("right_to_left", ALTERNATE_THROW_PERSPECTIVE),
+    "left_to_right"
+  );
+  assert.equal(
+    __referenceInternals.toSourceWindId("headwind", ALTERNATE_THROW_PERSPECTIVE),
+    "headwind"
+  );
+  assert.equal(
+    __referenceInternals.toSourceShotId("long_left", ALTERNATE_THROW_PERSPECTIVE),
+    "long_right"
+  );
+  assert.equal(
+    __referenceInternals.toSourceShotId("straight", ALTERNATE_THROW_PERSPECTIVE),
+    "straight"
+  );
+});
+
+test("perspective-aware config getters mirror directional labels and icons", () => {
+  const mirroredWinds = getWindDirections(ALTERNATE_THROW_PERSPECTIVE);
+  const mirroredShots = getShotShapes(ALTERNATE_THROW_PERSPECTIVE);
+
+  const rightToLeftWind = mirroredWinds.find((item) => item.id === "right_to_left");
+  assert.ok(rightToLeftWind);
+  assert.equal(rightToLeftWind.label, "L→R Cross");
+  assert.equal(rightToLeftWind.icon, "→");
+
+  const shortLeftShot = mirroredShots.find((item) => item.id === "short_left");
+  assert.ok(shortLeftShot);
+  assert.equal(shortLeftShot.label, "Short Right Turn");
+  assert.equal(shortLeftShot.icon, "↗️");
+});
+
+test("getRecommendation mirrors canonical result text for alternate perspective", () => {
+  const mirroredRecommendation = getRecommendation({
+    windId: "right_to_left",
+    terrainId: "flat",
+    shotId: "long_left",
+    releaseAngle: "flat",
+    perspective: ALTERNATE_THROW_PERSPECTIVE,
+  });
+
+  const canonicalRecommendation = getRecommendation({
+    windId: "left_to_right",
+    terrainId: "flat",
+    shotId: "long_right",
+    releaseAngle: "flat",
+  });
+
+  assert.ok(mirroredRecommendation);
+  assert.ok(canonicalRecommendation);
+  assert.equal(mirroredRecommendation.disc, canonicalRecommendation.disc);
+  assert.equal(mirroredRecommendation.category, canonicalRecommendation.category);
+  assert.equal(
+    mirroredRecommendation.summary,
+    __referenceInternals.mirrorDirectionalText(canonicalRecommendation.summary)
+  );
+  assert.equal(
+    mirroredRecommendation.aimNote,
+    __referenceInternals.mirrorDirectionalText(canonicalRecommendation.aimNote)
+  );
+  assert.deepEqual(
+    mirroredRecommendation.tips,
+    canonicalRecommendation.tips.map((tip) =>
+      __referenceInternals.mirrorDirectionalText(tip)
+    )
+  );
+});
+
+test("getReferenceCardsForCondition mirrors matched values and directional text", () => {
+  const mirroredCards = getReferenceCardsForCondition({
+    windId: "right_to_left",
+    terrainId: "flat",
+    shotId: "long_left",
+    releaseAngle: "flat",
+    perspective: ALTERNATE_THROW_PERSPECTIVE,
+  });
+
+  const canonicalCards = getReferenceCardsForCondition({
+    windId: "left_to_right",
+    terrainId: "flat",
+    shotId: "long_right",
+    releaseAngle: "flat",
+  });
+
+  assert.equal(mirroredCards.length, canonicalCards.length);
+
+  for (const mirroredCard of mirroredCards) {
+    const canonicalCard = canonicalCards.find(
+      (card) => card.profileId === mirroredCard.profileId
+    );
+    assert.ok(canonicalCard);
+    assert.equal(
+      mirroredCard.baseExplanation,
+      __referenceInternals.mirrorDirectionalText(canonicalCard.baseExplanation)
+    );
+    assert.equal(mirroredCard.factorExplanations.wind.length, 1);
+    assert.equal(mirroredCard.factorExplanations.shot.length, 1);
+    assert.deepEqual(mirroredCard.factorExplanations.wind[0].matchedValues, [
+      "right_to_left",
+    ]);
+    assert.deepEqual(mirroredCard.factorExplanations.shot[0].matchedValues, [
+      "long_left",
+    ]);
+    assert.equal(
+      mirroredCard.factorExplanations.wind[0].text,
+      __referenceInternals.mirrorDirectionalText(
+        canonicalCard.factorExplanations.wind[0].text
+      )
+    );
+  }
+});
+
+test("token-safe text mirror swaps directional phrases without corruption", () => {
+  const sourceText =
+    "RHBH players in right-to-left wind should aim right; LHBH in left-to-right should aim left.";
+  const mirroredText = __referenceInternals.mirrorDirectionalText(sourceText);
+
+  assert.equal(
+    mirroredText,
+    "RHFH players in left-to-right wind should aim left; LHFH in right-to-left should aim right."
+  );
 });

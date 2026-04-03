@@ -5,6 +5,7 @@ import normalizedRecommendations from "../data/recommendations.json" with { type
 import {
   ALTERNATE_THROW_PERSPECTIVE,
   __referenceInternals,
+  getCategoryComparisonForCondition,
   getRecommendation,
   getShotShapes,
   getReferenceCardsForCondition,
@@ -17,6 +18,67 @@ test("getRecommendation throws AppError for invalid keys", () => {
     () =>
       getRecommendation({
         windId: "not-a-real-wind",
+        terrainId: "flat",
+        shotId: "straight",
+      }),
+    (error) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(
+        error.userMessage,
+        "Could not read recommendation data. Check your selected conditions."
+      );
+      assert.match(error.debugContext, /Unknown wind id/);
+      return true;
+    }
+  );
+});
+
+test("getCategoryComparisonForCondition returns all three disc categories", () => {
+  const result = getCategoryComparisonForCondition({
+    windId: "headwind",
+    terrainId: "flat",
+    shotId: "straight",
+  });
+
+  assert.ok(result);
+  assert.equal(result.categoryComparisons.length, 3);
+  assert.deepEqual(
+    result.categoryComparisons.map((item) => item.category),
+    ["driver", "mid", "putter"]
+  );
+});
+
+test("category comparisons share stability and preserve one primary category", () => {
+  const result = getCategoryComparisonForCondition({
+    windId: "tailwind_right_to_left",
+    terrainId: "downhill",
+    shotId: "short_right",
+  });
+
+  assert.ok(result);
+
+  for (const item of result.categoryComparisons) {
+    assert.equal(item.disc, result.primaryRecommendation.disc);
+    assert.equal(typeof item.fitScore, "number");
+    assert.ok(item.whenToUse.length > 0);
+    assert.ok(item.tradeoff.length > 0);
+  }
+
+  const primaryMatches = result.categoryComparisons.filter(
+    (item) => item.isPrimaryMatch
+  );
+  assert.equal(primaryMatches.length, 1);
+  assert.equal(
+    primaryMatches[0].category,
+    result.primaryRecommendation.category
+  );
+});
+
+test("getCategoryComparisonForCondition throws AppError for invalid keys", () => {
+  assert.throws(
+    () =>
+      getCategoryComparisonForCondition({
+        windId: "bad-wind-id",
         terrainId: "flat",
         shotId: "straight",
       }),
@@ -250,6 +312,48 @@ test("getRecommendation mirrors canonical result text for alternate perspective"
       __referenceInternals.mirrorDirectionalText(tip)
     )
   );
+});
+
+test("getCategoryComparisonForCondition preserves mirrored perspective parity", () => {
+  const mirrored = getCategoryComparisonForCondition({
+    windId: "right_to_left",
+    terrainId: "flat",
+    shotId: "long_left",
+    perspective: ALTERNATE_THROW_PERSPECTIVE,
+  });
+
+  const canonical = getCategoryComparisonForCondition({
+    windId: "left_to_right",
+    terrainId: "flat",
+    shotId: "long_right",
+  });
+
+  assert.ok(mirrored);
+  assert.ok(canonical);
+  assert.equal(
+    mirrored.primaryRecommendation.category,
+    canonical.primaryRecommendation.category
+  );
+  assert.equal(
+    mirrored.primaryRecommendation.disc,
+    canonical.primaryRecommendation.disc
+  );
+
+  for (const category of ["driver", "mid", "putter"]) {
+    const mirroredCard = mirrored.categoryComparisons.find(
+      (item) => item.category === category
+    );
+    const canonicalCard = canonical.categoryComparisons.find(
+      (item) => item.category === category
+    );
+
+    assert.ok(mirroredCard);
+    assert.ok(canonicalCard);
+    assert.equal(mirroredCard.fitScore, canonicalCard.fitScore);
+    assert.equal(mirroredCard.isPrimaryMatch, canonicalCard.isPrimaryMatch);
+    assert.equal(mirroredCard.whenToUse, canonicalCard.whenToUse);
+    assert.equal(mirroredCard.tradeoff, canonicalCard.tradeoff);
+  }
 });
 
 test("getReferenceCardsForCondition mirrors matched values and directional text", () => {

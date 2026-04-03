@@ -4,7 +4,7 @@ import {
   DEFAULT_THROW_PERSPECTIVE,
   TERRAIN_TYPES,
   discColors,
-  getRecommendation,
+  getCategoryComparisonForCondition,
   getShotShapes,
   getWindDirections,
 } from '@frisbee-wind/core';
@@ -24,8 +24,8 @@ export default function SuggesterTab({
   const windOptions = windDirections.filter((wind) => wind.id !== 'no_wind');
   const effectiveWind = selectedWind || 'no_wind';
 
-  const selectedRecommendation = selectedShot && selectedTerrain
-    ? getRecommendation({
+  const comparisonResult = selectedShot && selectedTerrain
+    ? getCategoryComparisonForCondition({
       shotId: selectedShot,
       terrainId: selectedTerrain,
       windId: effectiveWind,
@@ -33,7 +33,7 @@ export default function SuggesterTab({
     })
     : null;
 
-  const results = selectedRecommendation ? [selectedRecommendation] : [];
+  const results = comparisonResult?.categoryComparisons || [];
 
   return (
     <View>
@@ -111,33 +111,25 @@ export default function SuggesterTab({
         <View>
           {results && results.length > 0 ? (
             <View className="gap-3">
-              <Text className="text-xs text-gray-500 uppercase tracking-widest mb-1">Recommendation</Text>
-              {results.map((r: any, i: number) => {
-                const c = discColors[r.disc] || discColors.stable;
+              <Text className="text-xs text-gray-500 uppercase tracking-widest mb-1">Category Comparison</Text>
+              {results.map((result: any) => {
+                const c = discColors[result.disc] || discColors.stable;
                 return (
-                  <View key={i} className={`rounded-lg border-2 p-4 ${c.border} ${c.bg}`}>
+                  <View key={result.category} className={`rounded-lg border-2 p-4 ${c.border} ${c.bg}`}>
                     <View className="flex-row flex-wrap items-center gap-2 mb-3">
-                      {i === 0 && results.length > 1 && (
-                        <Text className="text-xs px-2 py-0.5 rounded bg-white/10 text-white font-bold">#1</Text>
+                      {result.isPrimaryMatch && (
+                        <Text className="text-xs px-2 py-0.5 rounded bg-white/10 text-white font-bold">Primary Match</Text>
                       )}
-                      <Text className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${c.badge}`}>{r.disc}</Text>
-                      <Text className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300 font-bold uppercase">{r.category}</Text>
-                      <Text className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300 font-bold uppercase">{r.angle}</Text>
+                      <Text className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${c.badge}`}>{result.disc}</Text>
+                      <Text className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300 font-bold uppercase">{result.category}</Text>
                     </View>
-                    <Text className="text-sm text-gray-200 leading-relaxed mb-3">{r.summary}</Text>
-                    <View className="flex-row items-center gap-2 mb-3">
-                      <Text className="text-xs text-gray-500 uppercase tracking-widest">Aim</Text>
-                      <Text className={`text-sm font-bold ${c.accent}`}>{r.aimNote}</Text>
+                    <View className="mb-3">
+                      <Text className={`text-xs uppercase tracking-widest mb-1 ${c.accent}`}>When to use</Text>
+                      <Text className="text-sm text-gray-200 leading-relaxed">{result.whenToUse}</Text>
                     </View>
                     <View className="border-t border-gray-700 pt-3">
-                      <Text className={`text-xs uppercase tracking-widest mb-1 ${c.accent}`}>💡 Tips</Text>
-                      {r.tips && r.tips.length > 0 ? (
-                        r.tips.map((tip: string, tipIndex: number) => (
-                          <Text key={tipIndex} className="text-sm text-gray-300 leading-relaxed">{`\u2022 ${tip}`}</Text>
-                        ))
-                      ) : (
-                        <Text className="text-sm text-gray-300 leading-relaxed">{r.tip}</Text>
-                      )}
+                      <Text className={`text-xs uppercase tracking-widest mb-1 ${c.accent}`}>Tradeoff</Text>
+                      <Text className="text-sm text-gray-300 leading-relaxed">{result.tradeoff}</Text>
                     </View>
                   </View>
                 );

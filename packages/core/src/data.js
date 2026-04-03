@@ -168,6 +168,10 @@ const WIND_CONFIG_BY_ID = Object.fromEntries(
   WIND_CONFIG.map((entry) => [entry.id, entry])
 );
 
+const TERRAIN_CONFIG_BY_ID = Object.fromEntries(
+  TERRAIN_CONFIG.map((entry) => [entry.id, entry])
+);
+
 const SHOT_CONFIG_BY_ID = Object.fromEntries(
   SHOT_CONFIG.map((entry) => [entry.id, entry])
 );
@@ -265,6 +269,89 @@ const CATEGORY_ORDER = {
   driver: 0,
   mid: 1,
   putter: 2,
+};
+
+const CATEGORY_COMPARISON_ORDER = ["driver", "mid", "putter"];
+
+const PRIMARY_CATEGORY_ANCHOR_BONUS = 5;
+
+const SHOT_FIT_SCORES = {
+  max_distance: {
+    driver: 48,
+    mid: 24,
+    putter: 8,
+  },
+  long_shape: {
+    driver: 44,
+    mid: 26,
+    putter: 10,
+  },
+  straight: {
+    driver: 34,
+    mid: 32,
+    putter: 20,
+  },
+  short_shape: {
+    driver: 18,
+    mid: 40,
+    putter: 30,
+  },
+  putting: {
+    driver: 4,
+    mid: 18,
+    putter: 52,
+  },
+};
+
+const WIND_FIT_SCORES = {
+  calm: {
+    driver: 8,
+    mid: 8,
+    putter: 8,
+  },
+  headwind: {
+    driver: 13,
+    mid: 8,
+    putter: 4,
+  },
+  tailwind: {
+    driver: 10,
+    mid: 9,
+    putter: 7,
+  },
+  crosswind: {
+    driver: 9,
+    mid: 10,
+    putter: 8,
+  },
+  headwind_cross: {
+    driver: 12,
+    mid: 8,
+    putter: 4,
+  },
+  tailwind_cross: {
+    driver: 10,
+    mid: 9,
+    putter: 6,
+  },
+};
+
+const TERRAIN_FIT_SCORES = {
+  uphill: {
+    driver: 10,
+    mid: 8,
+    putter: 5,
+  },
+  flat: {
+    driver: 8,
+    mid: 8,
+    putter: 8,
+  },
+  downhill: {
+    driver: 6,
+    mid: 8,
+    putter: 10,
+  },
 };
 
 export const WIND_DIRECTIONS = WIND_CONFIG.map(({ id, label, icon, desc }) => ({
@@ -1114,6 +1201,381 @@ function toCardTips(profile, matchedFactorSets, perspective) {
   return Array.from(tips);
 }
 
+function resolveRecommendationSelection(functionName, params) {
+  const selectedPerspective = toThrowPerspective(functionName, params.perspective);
+  const wind = toSourceValue(
+    functionName,
+    "wind",
+    toSourceWindId(params.windId, selectedPerspective),
+    WIND_ID_TO_SOURCE
+  );
+  const terrain = toSourceValue(
+    functionName,
+    "terrain",
+    params.terrainId,
+    TERRAIN_ID_TO_SOURCE
+  );
+  const shot = toSourceValue(
+    functionName,
+    "shot",
+    toSourceShotId(params.shotId, selectedPerspective),
+    SHOT_ID_TO_SOURCE
+  );
+  const selectedReleaseAngle = toSourceReleaseAngle(
+    functionName,
+    params.releaseAngle
+  );
+
+  return {
+    selectedPerspective,
+    selectedWindId: params.windId,
+    selectedTerrainId: params.terrainId,
+    selectedShotId: params.shotId,
+    wind,
+    terrain,
+    shot,
+    releaseAngle: selectedReleaseAngle,
+  };
+}
+
+function findCondition(selection) {
+  const key = buildConditionKey({
+    wind: selection.wind,
+    terrain: selection.terrain,
+    shot: selection.shot,
+    releaseAngle: selection.releaseAngle,
+  });
+
+  return CONDITION_BY_KEY.get(key) || null;
+}
+
+function toShotFamily(functionName, sourceShot) {
+  if (sourceShot === "distance") {
+    return "max_distance";
+  }
+  if (
+    sourceShot === "long_left" ||
+    sourceShot === "long_right" ||
+    sourceShot === "s_curve"
+  ) {
+    return "long_shape";
+  }
+  if (sourceShot === "straight") {
+    return "straight";
+  }
+  if (sourceShot === "short_left" || sourceShot === "short_right") {
+    return "short_shape";
+  }
+  if (sourceShot === "putting") {
+    return "putting";
+  }
+
+  throwAppError(
+    functionName,
+    "Could not read recommendation data. Check your selected conditions.",
+    `Unsupported shot for category comparison: ${sourceShot}`
+  );
+}
+
+function toWindPattern(functionName, sourceWind) {
+  if (sourceWind === "no_wind") {
+    return "calm";
+  }
+  if (sourceWind === "headwind") {
+    return "headwind";
+  }
+  if (sourceWind === "tailwind") {
+    return "tailwind";
+  }
+  if (sourceWind === "left_to_right" || sourceWind === "right_to_left") {
+    return "crosswind";
+  }
+  if (sourceWind.startsWith("headwind_")) {
+    return "headwind_cross";
+  }
+  if (sourceWind.startsWith("tailwind_")) {
+    return "tailwind_cross";
+  }
+
+  throwAppError(
+    functionName,
+    "Could not read recommendation data. Check your selected conditions.",
+    `Unsupported wind for category comparison: ${sourceWind}`
+  );
+}
+
+function toDisplayShotLabel(functionName, shotId, perspective) {
+  const shotOption = SHOT_CONFIG_BY_ID[shotId];
+  if (!shotOption) {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `Unknown shot id for comparison label: ${shotId}`
+    );
+  }
+
+  return getDirectionalOptionByPerspective(
+    shotOption,
+    SHOT_CONFIG_BY_ID,
+    MIRRORED_SHOT_ID,
+    perspective
+  ).label;
+}
+
+function toDisplayWindLabel(functionName, windId, perspective) {
+  const windOption = WIND_CONFIG_BY_ID[windId];
+  if (!windOption) {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `Unknown wind id for comparison label: ${windId}`
+    );
+  }
+
+  return getDirectionalOptionByPerspective(
+    windOption,
+    WIND_CONFIG_BY_ID,
+    MIRRORED_WIND_ID,
+    perspective
+  ).label;
+}
+
+function toTerrainLabel(functionName, terrainId) {
+  const terrainOption = TERRAIN_CONFIG_BY_ID[terrainId];
+  if (!terrainOption) {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `Unknown terrain id for comparison label: ${terrainId}`
+    );
+  }
+  return terrainOption.label;
+}
+
+function toShotUseGuidance(category, shotFamily, shotLabel) {
+  if (category === "driver") {
+    if (shotFamily === "max_distance") {
+      return `Use a driver for ${shotLabel.toLowerCase()} lines that need maximum carry.`;
+    }
+    if (shotFamily === "long_shape") {
+      return `Use a driver for ${shotLabel.toLowerCase()} lines that need long carry before shape.`;
+    }
+    if (shotFamily === "straight") {
+      return "Use a driver when this straight line is long enough to demand speed.";
+    }
+    if (shotFamily === "short_shape") {
+      return `Use a driver only if this ${shotLabel.toLowerCase()} line still needs speed through wind.`;
+    }
+    return "Use a driver only for long wind-fighting putts outside normal putting range.";
+  }
+
+  if (category === "mid") {
+    if (shotFamily === "max_distance") {
+      return "Use a mid when you want distance with tighter landing control than a driver.";
+    }
+    if (shotFamily === "long_shape") {
+      return `Use a mid for ${shotLabel.toLowerCase()} lines when control matters more than pure carry.`;
+    }
+    if (shotFamily === "straight") {
+      return "Use a mid for an accuracy-first straight line.";
+    }
+    if (shotFamily === "short_shape") {
+      return `Use a mid for controlled ${shotLabel.toLowerCase()} approaches with predictable finish.`;
+    }
+    return "Use a mid for long approaches outside normal putting distance.";
+  }
+
+  if (shotFamily === "max_distance") {
+    return "Use a putter only when touch and landing control matter more than carry.";
+  }
+  if (shotFamily === "long_shape") {
+    return `Use a putter only if this ${shotLabel.toLowerCase()} line is touch-first and distance-limited.`;
+  }
+  if (shotFamily === "straight") {
+    return "Use a putter for touch-first straight lines with a soft landing.";
+  }
+  if (shotFamily === "short_shape") {
+    return `Use a putter for short ${shotLabel.toLowerCase()} touch lines with minimal ground play.`;
+  }
+  return "Use a putter as the default for committed putts and short touch finishes.";
+}
+
+function toWindGuidance(category, windPattern, windLabel) {
+  const lowercaseWind = windLabel.toLowerCase();
+  if (windPattern === "calm") {
+    return `In ${lowercaseWind}, control is easier to repeat.`;
+  }
+  if (windPattern === "headwind" || windPattern === "headwind_cross") {
+    if (category === "driver") {
+      return `In ${lowercaseWind}, driver speed helps hold line.`;
+    }
+    if (category === "mid") {
+      return `In ${lowercaseWind}, throw firmly to keep mids from drifting.`;
+    }
+    return `In ${lowercaseWind}, keep putters low and committed.`;
+  }
+  if (windPattern === "tailwind" || windPattern === "tailwind_cross") {
+    if (category === "driver") {
+      return `In ${lowercaseWind}, manage power because carry can spike.`;
+    }
+    if (category === "mid") {
+      return `In ${lowercaseWind}, mids usually stay controllable with clean glide.`;
+    }
+    return `In ${lowercaseWind}, commit to pace so glide does not drop early.`;
+  }
+  if (category === "driver") {
+    return `In ${lowercaseWind}, expect larger lateral movement at driver speed.`;
+  }
+  if (category === "mid") {
+    return `In ${lowercaseWind}, mids usually offer cleaner lateral control.`;
+  }
+  return `In ${lowercaseWind}, putters need a firm release to resist drift.`;
+}
+
+function toTerrainGuidance(category, terrainLabel) {
+  const lowercaseTerrain = terrainLabel.toLowerCase();
+  if (lowercaseTerrain === "uphill") {
+    if (category === "driver") {
+      return "Uphill rewards the extra speed.";
+    }
+    if (category === "mid") {
+      return "Uphill may require a firmer commit.";
+    }
+    return "Uphill can make putters stall early.";
+  }
+  if (lowercaseTerrain === "downhill") {
+    if (category === "driver") {
+      return "Downhill can add big carry and skip.";
+    }
+    if (category === "mid") {
+      return "Downhill pairs well with controlled glide.";
+    }
+    return "Downhill favors soft landings.";
+  }
+  if (category === "driver") {
+    return "Flat ground keeps the full-flight profile predictable.";
+  }
+  if (category === "mid") {
+    return "Flat ground keeps the control profile predictable.";
+  }
+  return "Flat ground keeps touch and landing predictable.";
+}
+
+function toTradeoffGuidance(category, shotFamily, windPattern, terrain) {
+  let text = "";
+  if (category === "driver") {
+    text = "Highest carry potential, but the biggest miss distance.";
+    if (shotFamily === "putting") {
+      return `${text} Easy to sail long past the basket.`;
+    }
+    if (terrain === "downhill") {
+      return `${text} Downhill misses can skip far past target.`;
+    }
+    return text;
+  }
+
+  if (category === "mid") {
+    text = "Best control-to-distance balance, but less peak carry than a driver.";
+    if (shotFamily === "max_distance") {
+      return `${text} It may finish short when full distance is required.`;
+    }
+    return text;
+  }
+
+  text = "Best touch and landing control, but limited carry on longer lines.";
+  if (shotFamily === "max_distance" || shotFamily === "long_shape") {
+    return `${text} It can run out of speed before the full line develops.`;
+  }
+  if (windPattern === "headwind" || windPattern === "headwind_cross") {
+    return `${text} Headwind can move it unless thrown firmly.`;
+  }
+  return text;
+}
+
+function toCategoryComparisonScores(
+  functionName,
+  sourceShot,
+  sourceWind,
+  sourceTerrain,
+  primaryCategory
+) {
+  const shotFamily = toShotFamily(functionName, sourceShot);
+  const windPattern = toWindPattern(functionName, sourceWind);
+  const shotScores = SHOT_FIT_SCORES[shotFamily];
+  const windScores = WIND_FIT_SCORES[windPattern];
+  const terrainScores = TERRAIN_FIT_SCORES[sourceTerrain];
+
+  if (!shotScores || !windScores || !terrainScores) {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `Missing comparison scoring map for shot=${sourceShot}, wind=${sourceWind}, terrain=${sourceTerrain}`
+    );
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(CATEGORY_ORDER, primaryCategory)) {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `Unknown primary category for comparison: ${primaryCategory}`
+    );
+  }
+
+  const byCategory = {};
+  for (const category of CATEGORY_COMPARISON_ORDER) {
+    byCategory[category] =
+      shotScores[category] +
+      windScores[category] +
+      terrainScores[category] +
+      (category === primaryCategory ? PRIMARY_CATEGORY_ANCHOR_BONUS : 0);
+  }
+
+  return {
+    shotFamily,
+    windPattern,
+    byCategory,
+  };
+}
+
+function toCategoryComparisons(functionName, selection, primaryRecommendation) {
+  const scores = toCategoryComparisonScores(
+    functionName,
+    selection.shot,
+    selection.wind,
+    selection.terrain,
+    primaryRecommendation.category
+  );
+  const shotLabel = toDisplayShotLabel(
+    functionName,
+    selection.selectedShotId,
+    selection.selectedPerspective
+  );
+  const windLabel = toDisplayWindLabel(
+    functionName,
+    selection.selectedWindId,
+    selection.selectedPerspective
+  );
+  const terrainLabel = toTerrainLabel(functionName, selection.selectedTerrainId);
+
+  return CATEGORY_COMPARISON_ORDER.map((category) => ({
+    category,
+    disc: primaryRecommendation.disc,
+    isPrimaryMatch: category === primaryRecommendation.category,
+    fitScore: scores.byCategory[category],
+    whenToUse: `${toShotUseGuidance(category, scores.shotFamily, shotLabel)} ${toWindGuidance(
+      category,
+      scores.windPattern,
+      windLabel
+    )} ${toTerrainGuidance(category, terrainLabel)}`,
+    tradeoff: toTradeoffGuidance(
+      category,
+      scores.shotFamily,
+      scores.windPattern,
+      selection.terrain
+    ),
+  }));
+}
+
 /**
  * Get a single suggester recommendation for one wind + terrain + shot combination.
  *
@@ -1133,40 +1595,72 @@ export function getRecommendation({
   perspective = DEFAULT_THROW_PERSPECTIVE,
 }) {
   const functionName = "getRecommendation";
-  const selectedPerspective = toThrowPerspective(functionName, perspective);
-  const wind = toSourceValue(
-    functionName,
-    "wind",
-    toSourceWindId(windId, selectedPerspective),
-    WIND_ID_TO_SOURCE
-  );
-  const terrain = toSourceValue(
-    functionName,
-    "terrain",
+  const selection = resolveRecommendationSelection(functionName, {
+    windId,
     terrainId,
-    TERRAIN_ID_TO_SOURCE
-  );
-  const shot = toSourceValue(
-    functionName,
-    "shot",
-    toSourceShotId(shotId, selectedPerspective),
-    SHOT_ID_TO_SOURCE
-  );
-  const selectedReleaseAngle = toSourceReleaseAngle(functionName, releaseAngle);
-
-  const key = buildConditionKey({
-    wind,
-    terrain,
-    shot,
-    releaseAngle: selectedReleaseAngle,
+    shotId,
+    releaseAngle,
+    perspective,
   });
-
-  const condition = CONDITION_BY_KEY.get(key);
+  const condition = findCondition(selection);
   if (!condition) {
     return null;
   }
 
-  return normalizeRecommendation(shotId, condition, selectedPerspective);
+  return normalizeRecommendation(
+    selection.selectedShotId,
+    condition,
+    selection.selectedPerspective
+  );
+}
+
+/**
+ * Get a suggester result package with the legacy primary recommendation and
+ * a driver/mid/putter comparison for the same selected conditions.
+ *
+ * @param {object} params Query parameters.
+ * @param {string} params.windId Selected wind id from WIND_DIRECTIONS.
+ * @param {string} params.terrainId Selected terrain id from TERRAIN_TYPES.
+ * @param {string} params.shotId Selected shot id from SHOT_SHAPES.
+ * @param {string} [params.releaseAngle] Optional release angle. Defaults to 'flat'.
+ * @param {string} [params.perspective='rhbh_lhfh'] Throw perspective id.
+ * @returns {{primaryRecommendation: object, categoryComparisons: object[]} | null}
+ *   Comparison package or null when the combination is unavailable.
+ */
+export function getCategoryComparisonForCondition({
+  windId,
+  terrainId,
+  shotId,
+  releaseAngle,
+  perspective = DEFAULT_THROW_PERSPECTIVE,
+}) {
+  const functionName = "getCategoryComparisonForCondition";
+  const selection = resolveRecommendationSelection(functionName, {
+    windId,
+    terrainId,
+    shotId,
+    releaseAngle,
+    perspective,
+  });
+  const condition = findCondition(selection);
+  if (!condition) {
+    return null;
+  }
+
+  const primaryRecommendation = normalizeRecommendation(
+    selection.selectedShotId,
+    condition,
+    selection.selectedPerspective
+  );
+
+  return {
+    primaryRecommendation,
+    categoryComparisons: toCategoryComparisons(
+      functionName,
+      selection,
+      primaryRecommendation
+    ),
+  };
 }
 
 /**

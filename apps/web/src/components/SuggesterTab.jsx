@@ -3,7 +3,7 @@ import {
   DEFAULT_THROW_PERSPECTIVE,
   TERRAIN_TYPES,
   discColors,
-  getRecommendation,
+  getCategoryComparisonForCondition,
   getShotShapes,
   getWindDirections,
 } from '@frisbee-wind/core';
@@ -19,8 +19,8 @@ export default function SuggesterTab({
   const windOptions = windDirections.filter((wind) => wind.id !== 'no_wind');
   const effectiveWind = selectedWind || 'no_wind';
 
-  const selectedRecommendation = selectedShot && selectedTerrain
-    ? getRecommendation({
+  const comparisonResult = selectedShot && selectedTerrain
+    ? getCategoryComparisonForCondition({
       shotId: selectedShot,
       terrainId: selectedTerrain,
       windId: effectiveWind,
@@ -28,7 +28,7 @@ export default function SuggesterTab({
     })
     : null;
 
-  const results = selectedRecommendation ? [selectedRecommendation] : [];
+  const results = comparisonResult?.categoryComparisons || [];
 
   return (
     <div>
@@ -94,35 +94,25 @@ export default function SuggesterTab({
         <div>
           {results && results.length > 0 ? (
             <div className="space-y-3">
-              <div className="text-xs text-gray-500 uppercase tracking-widest mb-3">Recommendation</div>
-              {results.map((r, i) => {
-                const c = discColors[r.disc] || discColors.stable;
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-3">Category Comparison</div>
+              {results.map((result) => {
+                const c = discColors[result.disc] || discColors.stable;
                 return (
-                  <div key={i} className={`rounded-lg border-2 p-4 ${c.border} ${c.bg}`}>
+                  <div key={result.category} className={`rounded-lg border-2 p-4 ${c.border} ${c.bg}`}>
                     <div className="flex flex-wrap items-center gap-2 mb-3">
-                      {i === 0 && results.length > 1 && (
-                        <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-white font-bold">#1</span>
+                      {result.isPrimaryMatch && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-white font-bold">Primary Match</span>
                       )}
-                      <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${c.badge}`}>{r.disc}</span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300 font-bold uppercase">{r.category}</span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300 font-bold uppercase">{r.angle}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${c.badge}`}>{result.disc}</span>
+                      <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300 font-bold uppercase">{result.category}</span>
                     </div>
-                    <p className="text-sm text-gray-200 leading-relaxed mb-3">{r.summary}</p>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs text-gray-500 uppercase tracking-widest">Aim</span>
-                      <span className={`text-sm font-bold ${c.accent}`}>{r.aimNote}</span>
+                    <div className="mb-3">
+                      <div className={`text-xs uppercase tracking-widest mb-1 ${c.accent}`}>When to use</div>
+                      <p className="text-sm text-gray-200 leading-relaxed">{result.whenToUse}</p>
                     </div>
                     <div className="border-t border-gray-700 pt-3">
-                      <div className={`text-xs uppercase tracking-widest mb-1 ${c.accent}`}>💡 Tips</div>
-                      {r.tips && r.tips.length > 0 ? (
-                        <ul className="text-sm text-gray-300 leading-relaxed list-disc list-inside space-y-1">
-                          {r.tips.map((tip, tipIndex) => (
-                            <li key={tipIndex}>{tip}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-gray-300 leading-relaxed">{r.tip}</p>
-                      )}
+                      <div className={`text-xs uppercase tracking-widest mb-1 ${c.accent}`}>Tradeoff</div>
+                      <p className="text-sm text-gray-300 leading-relaxed">{result.tradeoff}</p>
                     </div>
                   </div>
                 );

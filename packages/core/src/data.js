@@ -11,6 +11,77 @@ export const WIND_DIRECTIONS = [
   { id: "tail_l2r",   label: "Tail + L→R",  icon: "↗", desc: "Tailwind with left-to-right component" },
 ];
 
+// ─── Terrain Types ───────────────────────────────────────────────────────────
+
+export const TERRAIN_TYPES = [
+  { id: "uphill",   label: "Uphill",   icon: "⬆️", desc: "Throwing up a slope" },
+  { id: "flat",     label: "Flat",     icon: "➡️", desc: "Level ground, no elevation change" },
+  { id: "downhill", label: "Downhill", icon: "⬇️", desc: "Throwing down a slope" },
+];
+
+// Terrain adjustment: uphill acts like understable force (shift toward more stable/hyzer),
+// downhill acts like overstable/fade force (shift toward less stable/anhyzer).
+const _DISC_ORDER  = ['understable', 'stable', 'overstable'];
+const _ANGLE_ORDER = ['anhyzer', 'flat', 'hyzer'];
+
+export function terrainAdjust(results, terrain) {
+  if (!terrain || terrain === 'flat') return results;
+  const shift = terrain === 'uphill' ? 1 : -1;
+
+  const seen = new Set();
+  return results.map(r => {
+    const di = _DISC_ORDER.indexOf(r.disc);
+    const ai = _ANGLE_ORDER.indexOf(r.angle);
+    const newDi = Math.min(Math.max(di + shift, 0), 2);
+    const newAi = Math.min(Math.max(ai + shift, 0), 2);
+    const newDisc  = _DISC_ORDER[newDi];
+    const newAngle = _ANGLE_ORDER[newAi];
+    const discChanged  = newDisc  !== r.disc;
+    const angleChanged = newAngle !== r.angle;
+
+    let summaryPrefix, tipNote;
+
+    if (terrain === 'uphill') {
+      if (!discChanged && !angleChanged) {
+        summaryPrefix = 'Already at maximum stability — use the most overstable disc available on aggressive hyzer. ';
+        tipNote = 'Uphill adds flip/turn force and you are already at the stability ceiling. Use the heaviest, most overstable disc you own, commit to maximum hyzer, and add extra power to fight the slope.';
+      } else {
+        const what = [discChanged && `${newDisc} disc`, angleChanged && `${newAngle} release`].filter(Boolean).join(' with ');
+        summaryPrefix = `Uphill adds turn/flip force — using ${what} to compensate. `;
+        const why = [
+          discChanged  && `stepped up from ${r.disc} to ${newDisc} because uphill makes discs act more understable`,
+          angleChanged && `${newAngle === 'hyzer' ? 'added hyzer angle' : 'released flat'} to counter the uphill flip tendency`,
+        ].filter(Boolean).join('; ');
+        tipNote = `Uphill adjustment: ${why}. Also add extra power — you are throwing against the slope.`;
+      }
+    } else {
+      if (!discChanged && !angleChanged) {
+        summaryPrefix = 'Already at minimum stability — use the flippiest understable disc available on maximum anhyzer. ';
+        tipNote = 'Downhill adds overstable/fade force and you are already at the stability floor. Use the most understable disc you own, tilt to maximum anhyzer, and plan for significantly more distance than flat ground.';
+      } else {
+        const what = [discChanged && `${newDisc} disc`, angleChanged && `${newAngle} release`].filter(Boolean).join(' with ');
+        summaryPrefix = `Downhill adds fade — using ${what} to compensate. `;
+        const why = [
+          discChanged  && `stepped down from ${r.disc} to ${newDisc} because downhill makes discs act more overstable`,
+          angleChanged && `${newAngle === 'anhyzer' ? 'opened to anhyzer' : 'released flatter'} to fight the extra fade`,
+        ].filter(Boolean).join('; ');
+        tipNote = `Downhill adjustment: ${why}. Disc will fly noticeably farther than on flat ground — account for this in your landing zone.`;
+      }
+    }
+
+    const key = `${newDisc}|${newAngle}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    return {
+      ...r,
+      disc:    newDisc,
+      angle:   newAngle,
+      summary: summaryPrefix + r.summary,
+      tip:     tipNote + ' ' + r.tip,
+    };
+  }).filter(Boolean);
+}
+
 // ─── Shot Shapes ─────────────────────────────────────────────────────────────
 
 export const SHOT_SHAPES = [

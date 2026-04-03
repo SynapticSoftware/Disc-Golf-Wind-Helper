@@ -1,42 +1,22 @@
 import { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { WIND_DIRECTIONS, SHOT_SHAPES, suggestions, discColors, angleLabels, confidenceStyle } from '@frisbee-wind/core';
+import { WIND_DIRECTIONS, SHOT_SHAPES, TERRAIN_TYPES, suggestions, terrainAdjust, discColors, angleLabels, confidenceStyle } from '@frisbee-wind/core';
 
 export default function SuggesterTab() {
-  const [selectedWind, setSelectedWind] = useState<string | null>(null);
   const [selectedShot, setSelectedShot] = useState<string | null>(null);
+  const [selectedTerrain, setSelectedTerrain] = useState<string | null>(null);
+  const [selectedWind, setSelectedWind] = useState<string | null>(null);
 
-  const results = selectedWind && selectedShot
+  const baseResults = selectedWind && selectedShot
     ? (suggestions[selectedShot]?.[selectedWind] || [])
     : null;
+  const results = baseResults ? terrainAdjust(baseResults, selectedTerrain) : null;
 
   return (
     <View>
-      {/* Wind */}
-      <Text className="text-xs text-gray-500 uppercase tracking-widest mb-2">1. What's the wind doing?</Text>
-      <View className="flex-row flex-wrap gap-2 mb-5">
-        {WIND_DIRECTIONS.map((wind) => {
-          const active = selectedWind === wind.id;
-          return (
-            <Pressable
-              key={wind.id}
-              onPress={() => setSelectedWind(wind.id)}
-              className={`w-[23%] py-3 rounded border items-center gap-1 ${
-                active ? 'bg-yellow-900/40 border-yellow-500' : 'bg-gray-900 border-gray-700'
-              }`}
-            >
-              <Text className="text-2xl leading-none">{wind.icon}</Text>
-              <Text className={`text-xs font-bold text-center leading-tight ${active ? 'text-yellow-300' : 'text-gray-500'}`}>
-                {wind.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
       {/* Shot Shape */}
-      <Text className="text-xs text-gray-500 uppercase tracking-widest mb-2">2. What shot shape do you need?</Text>
-      <View className="flex-row flex-wrap gap-2 mb-6">
+      <Text className="text-xs text-gray-500 uppercase tracking-widest mb-2">1. What shot shape do you need?</Text>
+      <View className="flex-row flex-wrap gap-2 mb-5">
         {SHOT_SHAPES.map((shot) => {
           const active = selectedShot === shot.id;
           return (
@@ -56,15 +36,59 @@ export default function SuggesterTab() {
         })}
       </View>
 
+      {/* Terrain */}
+      <Text className="text-xs text-gray-500 uppercase tracking-widest mb-2">2. Uphill, flat, or downhill?</Text>
+      <View className="flex-row gap-2 mb-5">
+        {TERRAIN_TYPES.map((terrain) => {
+          const active = selectedTerrain === terrain.id;
+          return (
+            <Pressable
+              key={terrain.id}
+              onPress={() => setSelectedTerrain(terrain.id)}
+              className={`flex-1 py-3 rounded border items-center gap-1 ${
+                active ? 'bg-teal-900/40 border-teal-500' : 'bg-gray-900 border-gray-700'
+              }`}
+            >
+              <Text className="text-2xl leading-none">{terrain.icon}</Text>
+              <Text className={`text-xs font-bold text-center leading-tight ${active ? 'text-teal-300' : 'text-gray-500'}`}>
+                {terrain.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Wind */}
+      <Text className="text-xs text-gray-500 uppercase tracking-widest mb-2">3. What's the wind doing?</Text>
+      <View className="flex-row flex-wrap gap-2 mb-6">
+        {WIND_DIRECTIONS.map((wind) => {
+          const active = selectedWind === wind.id;
+          return (
+            <Pressable
+              key={wind.id}
+              onPress={() => setSelectedWind(prev => prev === wind.id ? null : wind.id)}
+              className={`w-[23%] py-3 rounded border items-center gap-1 ${
+                active ? 'bg-yellow-900/40 border-yellow-500' : 'bg-gray-900 border-gray-700'
+              }`}
+            >
+              <Text className="text-2xl leading-none">{wind.icon}</Text>
+              <Text className={`text-xs font-bold text-center leading-tight ${active ? 'text-yellow-300' : 'text-gray-500'}`}>
+                {wind.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       {/* Results */}
-      {selectedWind && selectedShot && (
+      {selectedShot && selectedWind && (
         <View>
           {results && results.length > 0 ? (
             <View className="gap-3">
               <Text className="text-xs text-gray-500 uppercase tracking-widest mb-1">
                 {results.length === 1 ? 'Recommendation' : 'Options — ranked best first'}
               </Text>
-              {results.map((r, i) => {
+              {results.map((r: any, i: number) => {
                 const c = discColors[r.disc];
                 const conf = confidenceStyle[r.confidence];
                 return (
@@ -103,9 +127,15 @@ export default function SuggesterTab() {
         </View>
       )}
 
-      {!selectedWind && !selectedShot && (
+      {!selectedShot && (
         <Text className="text-center text-gray-600 text-sm mt-4">
-          Select wind and shot shape above to get a suggestion.
+          Select a shot shape above to get started.
+        </Text>
+      )}
+
+      {selectedShot && !selectedWind && (
+        <Text className="text-center text-gray-600 text-sm mt-4">
+          Select a wind direction to get disc recommendations.
         </Text>
       )}
     </View>

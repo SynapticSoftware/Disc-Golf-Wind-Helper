@@ -1,35 +1,19 @@
 import { useState } from 'react';
-import { WIND_DIRECTIONS, SHOT_SHAPES, suggestions, discColors, angleLabels, confidenceStyle } from '@frisbee-wind/core';
+import { WIND_DIRECTIONS, SHOT_SHAPES, TERRAIN_TYPES, suggestions, terrainAdjust, discColors, angleLabels, confidenceStyle } from '@frisbee-wind/core';
 
 export default function SuggesterTab() {
-  const [selectedWind, setSelectedWind] = useState(null);
   const [selectedShot, setSelectedShot] = useState(null);
+  const [selectedTerrain, setSelectedTerrain] = useState(null);
+  const [selectedWind, setSelectedWind] = useState(null);
 
-  const results = selectedWind && selectedShot ? (suggestions[selectedShot]?.[selectedWind] || []) : null;
+  const baseResults = selectedWind && selectedShot ? (suggestions[selectedShot]?.[selectedWind] || []) : null;
+  const results = baseResults ? terrainAdjust(baseResults, selectedTerrain) : null;
 
   return (
     <div>
-      {/* Wind */}
-      <div className="mb-5">
-        <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">1. What's the wind doing?</div>
-        <div className="grid grid-cols-4 gap-2">
-          {WIND_DIRECTIONS.map((wind) => (
-            <button key={wind.id} onClick={() => setSelectedWind(wind.id)}
-              className={`py-3 px-2 rounded border text-center transition-all flex flex-col items-center justify-center gap-1 ${
-                selectedWind === wind.id
-                  ? 'bg-yellow-900/40 border-yellow-500 text-yellow-300'
-                  : 'bg-gray-900 border-gray-700 text-gray-500 hover:border-gray-500'
-              }`}>
-              <span className="text-3xl leading-none">{wind.icon}</span>
-              <span className="text-xs font-bold leading-tight">{wind.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Shot Shape */}
-      <div className="mb-6">
-        <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">2. What shot shape do you need?</div>
+      <div className="mb-5">
+        <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">1. What shot shape do you need?</div>
         <div className="grid grid-cols-4 gap-2">
           {SHOT_SHAPES.map((shot) => (
             <button key={shot.id} onClick={() => setSelectedShot(shot.id)}
@@ -45,8 +29,44 @@ export default function SuggesterTab() {
         </div>
       </div>
 
+      {/* Terrain */}
+      <div className="mb-5">
+        <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">2. Uphill, flat, or downhill?</div>
+        <div className="grid grid-cols-3 gap-2">
+          {TERRAIN_TYPES.map((terrain) => (
+            <button key={terrain.id} onClick={() => setSelectedTerrain(terrain.id)}
+              className={`py-3 px-2 rounded border text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                selectedTerrain === terrain.id
+                  ? 'bg-teal-900/40 border-teal-500 text-teal-300'
+                  : 'bg-gray-900 border-gray-700 text-gray-500 hover:border-gray-500'
+              }`}>
+              <span className="text-3xl leading-none">{terrain.icon}</span>
+              <span className="text-xs font-bold leading-tight">{terrain.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Wind */}
+      <div className="mb-6">
+        <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">3. What's the wind doing?</div>
+        <div className="grid grid-cols-4 gap-2">
+          {WIND_DIRECTIONS.map((wind) => (
+            <button key={wind.id} onClick={() => setSelectedWind(prev => prev === wind.id ? null : wind.id)}
+              className={`py-3 px-2 rounded border text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                selectedWind === wind.id
+                  ? 'bg-yellow-900/40 border-yellow-500 text-yellow-300'
+                  : 'bg-gray-900 border-gray-700 text-gray-500 hover:border-gray-500'
+              }`}>
+              <span className="text-3xl leading-none">{wind.icon}</span>
+              <span className="text-xs font-bold leading-tight">{wind.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Results */}
-      {selectedWind && selectedShot && (
+      {selectedShot && selectedWind && (
         <div>
           {results && results.length > 0 ? (
             <div className="space-y-3">
@@ -88,8 +108,12 @@ export default function SuggesterTab() {
         </div>
       )}
 
-      {!selectedWind && !selectedShot && (
-        <div className="text-center text-gray-600 text-sm mt-4">Select wind and shot shape above to get a suggestion.</div>
+      {!selectedShot && (
+        <div className="text-center text-gray-600 text-sm mt-4">Select a shot shape above to get started.</div>
+      )}
+
+      {selectedShot && !selectedWind && (
+        <div className="text-center text-gray-600 text-sm mt-4">Select a wind direction to get disc recommendations.</div>
       )}
     </div>
   );

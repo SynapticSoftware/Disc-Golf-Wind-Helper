@@ -431,12 +431,12 @@
           "stability": "overstable"
         },
         "angle": "flat",
-        "disc_explanation": "Headwind slows the putt and can push it off-line. Overstable putter maintains its line and fights the wind.",
-        "aim_point": "High on chains — wind will push the disc down",
+        "disc_explanation": "Headwind gets under the flight plate and adds lift. Overstable putter helps resist extra float and turn.",
+        "aim_point": "Lower center of chains — headwind lift can make putts rise",
         "tips": [
-          "Step closer if legal — headwind putts are one of the hardest shots.",
-          "Drive through the putt. Commit fully.",
-          "Aim higher than normal to compensate for wind drag."
+          "Aim lower than normal and keep nose angle neutral.",
+          "Use a firm, flat release instead of loft.",
+          "Overstable putter helps prevent headwind turn."
         ]
       }
     },
@@ -537,15 +537,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "overstable"
+          "stability": "stable"
         },
         "angle": "flat",
-        "disc_explanation": "Uphill + headwind means you must drive through the putt with power. Overstable putter won't deflect off-line.",
-        "aim_point": "High center of chains",
+        "disc_explanation": "Uphill needs extra carry, but headwind also adds lift. Stable putter balances float and control.",
+        "aim_point": "Center to slightly high chains",
         "tips": [
-          "Commit fully and punch it — the wind and uphill both steal momentum.",
-          "Aim higher than you think. The headwind kills elevation fast.",
-          "Overstable putter prevents last-second deflection."
+          "Commit to the putt, but avoid exaggerated nose-up release.",
+          "Let the headwind lift do part of the work.",
+          "Stable putter keeps glide without dumping early."
         ]
       }
     },
@@ -647,12 +647,12 @@
           "stability": "overstable"
         },
         "angle": "flat",
-        "disc_explanation": "Downhill extends the putt distance, headwind fights it. Overstable putter stays on line.",
-        "aim_point": "Center to slightly high chains",
+        "disc_explanation": "Downhill plus headwind can create floaty, long putts. Overstable putter adds a more controlled finish.",
+        "aim_point": "Low center chains",
         "tips": [
-          "Power through the headwind.",
-          "Downhill makes it easy to be short — commit to the putt.",
-          "Overstable prevents unexpected deflection."
+          "Power down slightly; lift plus downhill can sail long.",
+          "Aim low and trust the disc to rise into the target.",
+          "Use overstable for cleaner finish control."
         ]
       }
     }
@@ -755,15 +755,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "overstable"
+          "stability": "stable"
         },
         "angle": "flat",
-        "disc_explanation": "Tailwind pushes the disc through — overstable putter won't be pushed past the basket and stays on line.",
-        "aim_point": "Lower center of chains — tailwind carries it further than you think",
+        "disc_explanation": "Tailwind pushes on top of the flight plate, reducing lift and dropping putts early. Stable putter gives the cleanest line.",
+        "aim_point": "High center chains",
         "tips": [
-          "Aim lower — the disc will carry farther than normal.",
-          "Power down on your putt — tailwind adds momentum.",
-          "Overstable prevents the tailwind from pushing the disc past the chains."
+          "Aim higher than normal.",
+          "Add a little extra pace to keep putt on line.",
+          "Avoid overly overstable putters that can dump early."
         ]
       }
     },
@@ -862,14 +862,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "stable"
+          "stability": "understable"
         },
         "angle": "flat",
-        "disc_explanation": "Uphill requires power, tailwind helps — stable putter balances both for a controlled putt.",
-        "aim_point": "High center of chains",
+        "disc_explanation": "Uphill tailwind is a strong drop scenario. Understable putter helps hold glide long enough to reach the basket.",
+        "aim_point": "High on chains or just above center",
         "tips": [
-          "The tailwind helps push the disc uphill — aim high and commit.",
-          "Stable prevents unpredictable late fade."
+          "Add power; tailwind plus uphill can knock putts down quickly.",
+          "Start higher than normal.",
+          "Understable putter helps reduce early drop."
         ]
       }
     },
@@ -969,15 +970,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "overstable"
+          "stability": "stable"
         },
         "angle": "flat",
-        "disc_explanation": "Tailwind + downhill = way too much power gets to the disc. Overstable putter resists being pushed past the basket.",
-        "aim_point": "Low chains — disc will carry much farther than expected",
+        "disc_explanation": "Downhill adds carry, but tailwind still reduces lift. Stable putter keeps a controllable line without early dump.",
+        "aim_point": "Center to slightly high chains",
         "tips": [
-          "Power way down — this putt will fly.",
-          "Aim at the bottom of the basket.",
-          "Overstable prevents the tailwind from carrying the disc past the chains."
+          "Use smooth pace rather than float.",
+          "Aim a touch higher if putts are dropping short.",
+          "Stable putter balances downhill carry and tailwind drop."
         ]
       }
     }
@@ -1731,12 +1732,12 @@
           "stability": "overstable"
         },
         "angle": "flat",
-        "disc_explanation": "Headwind slows the putt, L-to-R drifts right. Overstable putter fights both forces.",
-        "aim_point": "High left of chains",
+        "disc_explanation": "Headwind lift plus L-to-R drift can raise and push putts right. Overstable putter resists excessive float.",
+        "aim_point": "Low left of center chains",
         "tips": [
-          "Power through the headwind.",
-          "Aim left — wind drifts it right to center.",
-          "These are difficult putting conditions."
+          "Aim left for crosswind drift and lower for headwind lift.",
+          "Use a flat, committed release.",
+          "Avoid lofty putts in this combo."
         ]
       }
     },
@@ -1835,15 +1836,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "overstable"
+          "stability": "stable"
         },
         "angle": "flat",
-        "disc_explanation": "Three factors fight the putt. Overstable putter with maximum commitment fights all three forces.",
-        "aim_point": "High left chains",
+        "disc_explanation": "Uphill, headwind lift, and L-to-R drift create a delicate balance. Stable putter keeps carry with manageable drift.",
+        "aim_point": "Center-left chains",
         "tips": [
-          "Step closer if possible.",
-          "Power through all three factors.",
-          "These are extremely difficult putting conditions."
+          "Aim slightly left and keep release flat.",
+          "Do not over-loft; headwind already adds lift.",
+          "Stable putter gives controllable glide uphill."
         ]
       }
     },
@@ -1945,11 +1946,12 @@
           "stability": "overstable"
         },
         "angle": "flat",
-        "disc_explanation": "Headwind fights; downhill carries far; L-to-R drifts right. Overstable handles all three.",
-        "aim_point": "Left of center, low chains",
+        "disc_explanation": "Downhill and headwind can float the putt while L-to-R pushes it right. Overstable putter improves finish control.",
+        "aim_point": "Low left chains",
         "tips": [
-          "Power through the headwind.",
-          "Aim left and low — downhill carries and wind drifts right."
+          "Aim low and left.",
+          "Reduce power to avoid sailing long.",
+          "Use overstable when you need a predictable finish."
         ]
       }
     }
@@ -2056,11 +2058,12 @@
           "stability": "overstable"
         },
         "angle": "flat",
-        "disc_explanation": "Headwind fights the putt; R-to-L drifts left. Overstable putter fights both and stays on line.",
-        "aim_point": "High right of chains",
+        "disc_explanation": "Headwind lift plus R-to-L drift can raise and push putts left. Overstable putter resists excessive float.",
+        "aim_point": "Low right of center chains",
         "tips": [
-          "Power through — headwind kills momentum.",
-          "Aim right — R-to-L drifts left to center."
+          "Aim right for crosswind drift and lower for headwind lift.",
+          "Use a flat, committed release.",
+          "Avoid lofty putts in this combo."
         ]
       }
     },
@@ -2160,15 +2163,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "overstable"
+          "stability": "stable"
         },
         "angle": "flat",
-        "disc_explanation": "Three left forces fight the putt. Overstable + maximum commitment fights all three.",
-        "aim_point": "High right chains",
+        "disc_explanation": "Uphill, headwind lift, and R-to-L drift create a delicate balance. Stable putter keeps carry with manageable drift.",
+        "aim_point": "Center-right chains",
         "tips": [
-          "Most difficult putting conditions — commit fully.",
-          "Step closer if possible.",
-          "Overstable and power through."
+          "Aim slightly right and keep release flat.",
+          "Do not over-loft; headwind already adds lift.",
+          "Stable putter gives controllable glide uphill."
         ]
       }
     },
@@ -2270,11 +2273,12 @@
           "stability": "overstable"
         },
         "angle": "flat",
-        "disc_explanation": "Headwind fights; downhill carries; R-to-L drifts left. Overstable handles all three.",
-        "aim_point": "Right of center, low chains",
+        "disc_explanation": "Downhill and headwind can float the putt while R-to-L pushes it left. Overstable putter improves finish control.",
+        "aim_point": "Low right chains",
         "tips": [
-          "Power through headwind.",
-          "Aim right and low — downhill carries and wind drifts left."
+          "Aim low and right.",
+          "Reduce power to avoid sailing long.",
+          "Use overstable when you need a predictable finish."
         ]
       }
     }
@@ -2379,14 +2383,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "overstable"
+          "stability": "stable"
         },
         "angle": "flat",
-        "disc_explanation": "Tailwind carries far; L-to-R drifts right. Overstable resists both pushes.",
-        "aim_point": "Left of center, lower chains",
+        "disc_explanation": "Tailwind downforce plus L-to-R drift can make putts drop and move right. Stable putter keeps a straighter push line.",
+        "aim_point": "High left of center chains",
         "tips": [
-          "Power way down — tailwind carries the putt further.",
-          "Aim left — L-to-R drifts to center."
+          "Aim left and higher.",
+          "Use a firm, flat release.",
+          "Expect less glide than calm air."
         ]
       }
     },
@@ -2485,14 +2490,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "overstable"
+          "stability": "understable"
         },
         "angle": "flat",
-        "disc_explanation": "Uphill needs power; tailwind helps; L-to-R drifts right. Overstable fights the drift.",
+        "disc_explanation": "Uphill with tailwind and L-to-R is one of the easiest ways to leave putts low-right. Understable putter helps hold glide.",
         "aim_point": "High left chains",
         "tips": [
-          "Tailwind helps uphill — don't over-power.",
-          "Aim high (uphill) and left (wind drift)."
+          "Add pace and height.",
+          "Aim left to offset drift.",
+          "Understable putter helps prevent early drop."
         ]
       }
     },
@@ -2593,14 +2599,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "overstable"
+          "stability": "stable"
         },
         "angle": "flat",
-        "disc_explanation": "Tailwind + downhill carry far; L-to-R drifts right. Overstable fights all three factors.",
-        "aim_point": "Left of center, very low chains",
+        "disc_explanation": "Downhill offsets some tailwind drop while L-to-R still drifts right. Stable putter gives the best overall control.",
+        "aim_point": "Center-left to slightly high chains",
         "tips": [
-          "Power way down — this putt will fly far.",
-          "Aim left and very low on the basket."
+          "Aim left of center.",
+          "Use controlled speed; avoid lofty nose-up putts.",
+          "Stable putter keeps this combo predictable."
         ]
       }
     }
@@ -2704,14 +2711,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "overstable"
+          "stability": "stable"
         },
         "angle": "flat",
-        "disc_explanation": "Tailwind carries far; R-to-L drifts left. Overstable fights both and lands the disc at the basket.",
-        "aim_point": "Right of center, low chains",
+        "disc_explanation": "Tailwind downforce plus R-to-L drift can make putts drop and move left. Stable putter keeps a straighter push line.",
+        "aim_point": "High right of center chains",
         "tips": [
-          "Power down — tailwind adds momentum.",
-          "Aim right — R-to-L drifts left."
+          "Aim right and higher.",
+          "Use a firm, flat release.",
+          "Expect less glide than calm air."
         ]
       }
     },
@@ -2811,14 +2819,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "stable"
+          "stability": "understable"
         },
         "angle": "flat",
-        "disc_explanation": "Tailwind helps uphill putt; R-to-L drifts left. Stable putter with aim compensation handles both.",
+        "disc_explanation": "Uphill with tailwind and R-to-L is one of the easiest ways to leave putts low-left. Understable putter helps hold glide.",
         "aim_point": "High right chains",
         "tips": [
-          "Tailwind helps the uphill — don't over-power.",
-          "Aim high (uphill) and right (R-to-L drift)."
+          "Add pace and height.",
+          "Aim right to offset drift.",
+          "Understable putter helps prevent early drop."
         ]
       }
     },
@@ -2919,14 +2928,15 @@
       "putting": {
         "disc": {
           "category": "putter",
-          "stability": "overstable"
+          "stability": "stable"
         },
         "angle": "flat",
-        "disc_explanation": "Tailwind + downhill carry far; R-to-L drifts left. Overstable fights both leftward forces.",
-        "aim_point": "Right of center, very low chains",
+        "disc_explanation": "Downhill offsets some tailwind drop while R-to-L still drifts left. Stable putter gives the best overall control.",
+        "aim_point": "Center-right to slightly high chains",
         "tips": [
-          "Power way down — this putt will fly.",
-          "Aim right and very low."
+          "Aim right of center.",
+          "Use controlled speed; avoid lofty nose-up putts.",
+          "Stable putter keeps this combo predictable."
         ]
       }
     }

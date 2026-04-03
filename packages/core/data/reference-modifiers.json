@@ -7,51 +7,51 @@
       ]
     },
     "headwind": {
-      "explanation": "Headwind increases effective turn and magnifies misses in release angle and speed.",
+      "explanation": "Headwind gets under the flight plate and adds lift, making the disc behave as if it is moving faster — more understable, turning right more. Throw nose-down and low to cut under the wind. Nose-up releases stall and hyzer out early.",
       "tips": [
-        "Move to more stable options or add hyzer when needed."
+        "Use more overstable than normal, throw low with a nose-down angle."
       ]
     },
     "tailwind": {
-      "explanation": "Tailwind reduces effective turn and can delay movement until late flight.",
+      "explanation": "Tailwind pushes on top of the flight plate, reducing lift and making the disc behave as if it is moving slower — more overstable, losing glide and fading sooner. Drop one stability class from what you'd throw in calm conditions. Throw slightly higher to compensate for the reduced glide.",
       "tips": [
-        "Use cleaner timing and avoid overpowering."
+        "Drop down in disc stability and speed class; throw higher than normal."
       ]
     },
     "right_to_left": {
-      "explanation": "Right-to-left crosswind adds left drift throughout flight.",
+      "explanation": "Right-to-left crosswind hits the bottom of the flight plate on a flat or hyzer release, adding lift and extra left push — amplifying the natural RHBH fade. On anhyzer it hits the top, reducing glide. R-to-L works with the natural disc fade.",
       "tips": [
-        "Plan an aim offset to the right."
+        "Use more overstable than calm conditions; aim right and let the combined forces work left."
       ]
     },
     "left_to_right": {
-      "explanation": "Left-to-right crosswind adds right drift throughout flight.",
+      "explanation": "Left-to-right crosswind hits the bottom of the flight plate on an anhyzer release, adding lift and right push — this is the distance-record wind. On a hyzer release it hits the top, reducing glide and pushing the disc down. Riding it with anhyzer generates extra carry.",
       "tips": [
-        "Plan an aim offset to the left."
+        "For distance, ride it with slight anhyzer. For control, use flat or hyzer to reduce wind exposure."
       ]
     },
     "headwind_right_to_left": {
-      "explanation": "Headwind plus right-to-left combines added turn pressure with leftward drift.",
+      "explanation": "Headwind adds lift and understable effect; R-to-L also pushes left and adds lift. Both forces promote left movement — strong overstable disc essential for straight shots. Going right is extremely difficult.",
       "tips": [
-        "Favor stable control lines and larger aim compensation."
+        "Maximum overstable needed; aim right; throw low and nose-down."
       ]
     },
     "headwind_left_to_right": {
-      "explanation": "Headwind plus left-to-right combines added turn pressure with rightward drift.",
+      "explanation": "Headwind adds lift and understable effect; L-to-R also pushes right. Both forces promote right movement — strong overstable disc essential for straight or left shots. Right shots are easy but hard to control.",
       "tips": [
-        "Choose controlled power and cleaner release angle."
+        "Maximum overstable for straight/left shots; throw low and nose-down to cut wind."
       ]
     },
     "tailwind_right_to_left": {
-      "explanation": "Tailwind plus right-to-left extends carry while pushing the disc left.",
+      "explanation": "Tailwind reduces lift and makes disc more overstable; R-to-L also pushes left. Both forces promote fade and left drift. Drop in stability and aim well right to compensate for the combined left movement.",
       "tips": [
-        "Use placement-first power and clear landing zone planning."
+        "Drop in stability; aim right; throw slightly higher than normal."
       ]
     },
     "tailwind_left_to_right": {
-      "explanation": "Tailwind plus left-to-right extends carry while pushing the disc right.",
+      "explanation": "Tailwind reduces lift and makes disc more overstable; L-to-R also pushes right. Both forces push right — unstable discs can flip violently. Use overstable to fly straight; understable only for intentional right shots.",
       "tips": [
-        "Keep throw smooth and match aim to expected drift."
+        "Use overstable for straight shots; aim left; throw slightly higher than normal."
       ]
     }
   },

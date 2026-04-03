@@ -1,55 +1,36 @@
 import { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { WIND_DIRECTIONS, refData, discColors, angleLabels } from '@frisbee-wind/core';
+import { WIND_DIRECTIONS, TERRAIN_TYPES, SHOT_SHAPES, getRecommendationsForCondition, discColors } from '@frisbee-wind/core';
 
 export default function ReferenceTab() {
-  const [selectedDisc, setSelectedDisc]   = useState<'understable' | 'stable' | 'overstable'>('stable');
-  const [selectedAngle, setSelectedAngle] = useState<'hyzer' | 'flat' | 'anhyzer'>('flat');
-  const [selectedWind, setSelectedWind]   = useState('headwind');
+  const [selectedTerrain, setSelectedTerrain] = useState('flat');
+  const [selectedWind, setSelectedWind] = useState('no_wind');
 
-  const result = refData[selectedDisc][selectedAngle][selectedWind];
-  const colors = discColors[selectedDisc];
+  const shotLabelById = Object.fromEntries(SHOT_SHAPES.map((shot) => [shot.id, shot.label]));
+  const results = getRecommendationsForCondition({
+    windId: selectedWind,
+    terrainId: selectedTerrain,
+  });
 
   return (
     <View>
-      {/* Disc Stability */}
-      <Text className="text-xs text-gray-500 uppercase tracking-widest mb-2">Disc Stability</Text>
+      {/* Terrain */}
+      <Text className="text-xs text-gray-500 uppercase tracking-widest mb-2">Terrain</Text>
       <View className="flex-row gap-2 mb-4">
-        {(['understable', 'stable', 'overstable'] as const).map((disc) => {
-          const c = discColors[disc];
-          const active = selectedDisc === disc;
+        {TERRAIN_TYPES.map((terrain) => {
+          const active = selectedTerrain === terrain.id;
           return (
             <Pressable
-              key={disc}
-              onPress={() => setSelectedDisc(disc)}
+              key={terrain.id}
+              onPress={() => setSelectedTerrain(terrain.id)}
+              accessibilityLabel={`Select terrain ${terrain.label}`}
               className={`flex-1 py-2 px-1 rounded border items-center ${
-                active ? `${c.bg} ${c.border}` : 'bg-gray-900 border-gray-700'
+                active ? 'bg-teal-900/40 border-teal-500' : 'bg-gray-900 border-gray-700'
               }`}
             >
-              <Text className={`text-xs font-bold uppercase ${active ? c.accent : 'text-gray-500'}`}>
-                {disc}
+              <Text className={`text-xs font-bold uppercase ${active ? 'text-teal-300' : 'text-gray-500'}`}>
+                {terrain.label}
               </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Throw Angle */}
-      <Text className="text-xs text-gray-500 uppercase tracking-widest mb-2">Throw Angle</Text>
-      <View className="flex-row gap-2 mb-4">
-        {(['hyzer', 'flat', 'anhyzer'] as const).map((angle) => {
-          const a = angleLabels[angle];
-          const active = selectedAngle === angle;
-          return (
-            <Pressable
-              key={angle}
-              onPress={() => setSelectedAngle(angle)}
-              className={`flex-1 py-2 px-1 rounded border items-center ${
-                active ? 'bg-gray-700 border-gray-400' : 'bg-gray-900 border-gray-700'
-              }`}
-            >
-              <Text className={`text-xs font-bold ${active ? 'text-white' : 'text-gray-500'}`}>{a.label}</Text>
-              <Text className={`text-xs mt-0.5 ${active ? 'text-gray-300' : 'text-gray-600'}`}>{a.sub}</Text>
             </Pressable>
           );
         })}
@@ -64,6 +45,7 @@ export default function ReferenceTab() {
             <Pressable
               key={wind.id}
               onPress={() => setSelectedWind(wind.id)}
+              accessibilityLabel={`Select wind ${wind.label}`}
               className={`w-[23%] py-3 rounded border items-center gap-1 ${
                 active ? 'bg-yellow-900/40 border-yellow-500' : 'bg-gray-900 border-gray-700'
               }`}
@@ -77,24 +59,40 @@ export default function ReferenceTab() {
         })}
       </View>
 
-      {/* Result */}
-      {result && (
-        <View className={`rounded-lg border-2 p-4 ${colors.border} ${colors.bg}`}>
-          <View className="flex-row flex-wrap gap-2 mb-4">
-            <Text className={`text-xs px-2 py-1 rounded font-bold uppercase ${colors.badge}`}>{selectedDisc}</Text>
-            <Text className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300 font-bold uppercase">{selectedAngle}</Text>
-            <Text className="text-xs px-2 py-1 rounded bg-yellow-900/40 text-yellow-300 font-bold">
-              {WIND_DIRECTIONS.find(w => w.id === selectedWind)?.label}
-            </Text>
+      {/* Results */}
+      <View className="gap-3">
+        <Text className="text-xs text-gray-500 uppercase tracking-widest mb-1">
+          Reference for all shot shapes in this wind + terrain
+        </Text>
+        {results.map((result: any) => {
+          const colors = discColors[result.disc] || discColors.stable;
+          return (
+            <View key={result.shotId} className={`rounded-lg border-2 p-4 ${colors.border} ${colors.bg}`}>
+              <View className="flex-row flex-wrap gap-2 mb-4">
+                <Text className="text-xs px-2 py-1 rounded bg-white/10 text-white font-bold uppercase">{shotLabelById[result.shotId]}</Text>
+                <Text className={`text-xs px-2 py-1 rounded font-bold uppercase ${colors.badge}`}>{result.disc}</Text>
+                <Text className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300 font-bold uppercase">{result.category}</Text>
+                <Text className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300 font-bold uppercase">{result.angle}</Text>
+              </View>
+              <Text className={`text-xs uppercase tracking-widest mb-1 ${colors.accent}`}>📡 Flight Explanation</Text>
+              <Text className="text-sm text-gray-200 leading-relaxed mb-4">{result.summary}</Text>
+              <Text className="text-xs text-gray-500 uppercase tracking-widest mb-1">Aim</Text>
+              <Text className={`text-sm font-bold mb-4 ${colors.accent}`}>{result.aimNote}</Text>
+              <View className="border-t border-gray-700 pt-4">
+                <Text className={`text-xs uppercase tracking-widest mb-1 ${colors.accent}`}>💡 Tips</Text>
+                {result.tips.map((tip: string, index: number) => (
+                  <Text key={index} className="text-sm text-gray-200 leading-relaxed">{`\u2022 ${tip}`}</Text>
+                ))}
+              </View>
+            </View>
+          );
+        })}
+        {results.length === 0 && (
+          <View className="rounded-lg border border-gray-700 bg-gray-900 p-5 items-center">
+            <Text className="text-sm text-gray-400 text-center">No reference data found for the selected condition.</Text>
           </View>
-          <Text className={`text-xs uppercase tracking-widest mb-1 ${colors.accent}`}>📡 Expected Behavior</Text>
-          <Text className="text-sm text-gray-200 leading-relaxed mb-4">{result.behavior}</Text>
-          <View className="border-t border-gray-700 pt-4">
-            <Text className={`text-xs uppercase tracking-widest mb-1 ${colors.accent}`}>💡 Throwing Tip</Text>
-            <Text className="text-sm text-gray-200 leading-relaxed">{result.tip}</Text>
-          </View>
-        </View>
-      )}
+        )}
+      </View>
     </View>
   );
 }

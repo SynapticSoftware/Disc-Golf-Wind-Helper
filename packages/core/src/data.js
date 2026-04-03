@@ -1,442 +1,3237 @@
-// ─── Wind Directions ─────────────────────────────────────────────────────────
+// Single source of truth for wind/terrain guidance.
+// This module is generated from disc-golf-wind-guide.json.
 
-export const WIND_DIRECTIONS = [
-  { id: "headwind",   label: "Headwind",    icon: "↓", desc: "Wind coming straight at you" },
-  { id: "tailwind",   label: "Tailwind",    icon: "↑", desc: "Wind pushing from behind" },
-  { id: "r2l",        label: "R→L Cross",   icon: "←", desc: "Wind blowing right to left" },
-  { id: "l2r",        label: "L→R Cross",   icon: "→", desc: "Wind blowing left to right" },
-  { id: "head_r2l",   label: "Head + R→L",  icon: "↙", desc: "Headwind with right-to-left component" },
-  { id: "head_l2r",   label: "Head + L→R",  icon: "↘", desc: "Headwind with left-to-right component" },
-  { id: "tail_r2l",   label: "Tail + R→L",  icon: "↖", desc: "Tailwind with right-to-left component" },
-  { id: "tail_l2r",   label: "Tail + L→R",  icon: "↗", desc: "Tailwind with left-to-right component" },
-];
+const WIND_GUIDE_META = {
+  "perspective": "RHBH (Right-Hand Backhand)",
+  "note": "All flight paths described from RHBH perspective. LHBH and forehand players should mirror left/right references.",
+  "version": "1.0",
+  "stability_key": {
+    "overstable": "High fade rating. Resists turning in wind. Reliable and predictable in adverse conditions.",
+    "stable": "Neutral. Flies the way you throw it. Most predictable in calm conditions.",
+    "understable": "Turns right before fading left (RHBH). Great for distance and flex shots but risky in headwinds."
+  },
+  "angle_key": {
+    "hyzer": "Throwing-side edge lower at release. Promotes left finish (RHBH). More wind-resistant.",
+    "flat": "Level at release. Neutral flight path.",
+    "anhyzer": "Throwing-side edge higher at release. Promotes right turn. Risky in headwinds."
+  },
+  "disc_categories": {
+    "driver": "Max distance. Needs higher arm speed to fly correctly. Most affected by wind.",
+    "mid": "Moderate distance. Easier to control. Good for accuracy shots.",
+    "putter": "Shortest range. Most accurate. Excellent for short shots and putting."
+  },
+  "shot_shapes": {
+    "straight": "Disc travels directly toward target with minimal left/right deviation.",
+    "short_left": "Disc finishes left of the line within short-to-mid range.",
+    "short_right": "Disc finishes right of the line within short-to-mid range.",
+    "long_left": "Disc carries full distance and finishes far left.",
+    "long_right": "Disc carries full distance and finishes far right.",
+    "s_curve": "Disc turns right early in flight then fades left at the end.",
+    "distance": "Maximum controlled distance throw.",
+    "putting": "Short-range putt to the basket."
+  }
+};
 
-// ─── Terrain Types ───────────────────────────────────────────────────────────
-
-export const TERRAIN_TYPES = [
-  { id: "uphill",   label: "Uphill",   icon: "⬆️", desc: "Throwing up a slope" },
-  { id: "flat",     label: "Flat",     icon: "➡️", desc: "Level ground, no elevation change" },
-  { id: "downhill", label: "Downhill", icon: "⬇️", desc: "Throwing down a slope" },
-];
-
-// Terrain adjustment: uphill acts like understable force (shift toward more stable/hyzer),
-// downhill acts like overstable/fade force (shift toward less stable/anhyzer).
-const _DISC_ORDER  = ['understable', 'stable', 'overstable'];
-const _ANGLE_ORDER = ['anhyzer', 'flat', 'hyzer'];
-
-export function terrainAdjust(results, terrain) {
-  if (!terrain || terrain === 'flat') return results;
-  const shift = terrain === 'uphill' ? 1 : -1;
-
-  const seen = new Set();
-  return results.map(r => {
-    const di = _DISC_ORDER.indexOf(r.disc);
-    const ai = _ANGLE_ORDER.indexOf(r.angle);
-    const newDi = Math.min(Math.max(di + shift, 0), 2);
-    const newAi = Math.min(Math.max(ai + shift, 0), 2);
-    const newDisc  = _DISC_ORDER[newDi];
-    const newAngle = _ANGLE_ORDER[newAi];
-    const discChanged  = newDisc  !== r.disc;
-    const angleChanged = newAngle !== r.angle;
-
-    let summaryPrefix, tipNote;
-
-    if (terrain === 'uphill') {
-      if (!discChanged && !angleChanged) {
-        summaryPrefix = 'Already at maximum stability — use the most overstable disc available on aggressive hyzer. ';
-        tipNote = 'Uphill adds flip/turn force and you are already at the stability ceiling. Use the heaviest, most overstable disc you own, commit to maximum hyzer, and add extra power to fight the slope.';
-      } else {
-        const what = [discChanged && `${newDisc} disc`, angleChanged && `${newAngle} release`].filter(Boolean).join(' with ');
-        summaryPrefix = `Uphill adds turn/flip force — using ${what} to compensate. `;
-        const why = [
-          discChanged  && `stepped up from ${r.disc} to ${newDisc} because uphill makes discs act more understable`,
-          angleChanged && `${newAngle === 'hyzer' ? 'added hyzer angle' : 'released flat'} to counter the uphill flip tendency`,
-        ].filter(Boolean).join('; ');
-        tipNote = `Uphill adjustment: ${why}. Also add extra power — you are throwing against the slope.`;
+const WIND_GUIDE_SOURCE = {
+  "no_wind": {
+    "flat": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Stable driver on a flat release tracks straight with a gentle fade at the end. No wind means no compensation needed.",
+        "aim_point": "Directly at target",
+        "tips": [
+          "Use your natural release angle.",
+          "Focus on a clean follow-through.",
+          "A stable mid is a safer option if accuracy matters more than distance."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Overstable mid naturally fades left at the end, producing a short left finish without needing a hyzer angle.",
+        "aim_point": "Right of target by 5-10 feet depending on distance",
+        "tips": [
+          "Let the disc's natural fade do the work.",
+          "Don't over-muscle it — overstable discs punish power with extra fade.",
+          "A putter on hyzer is an alternative for tight short-left shots."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "understable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Understable mid on anhyzer turns right and holds there on a short shot, finishing right of the target.",
+        "aim_point": "Left of target by 5-10 feet",
+        "tips": [
+          "Keep power moderate — too much speed and it won't turn enough.",
+          "A stable disc on a slight anhyzer also works here.",
+          "Watch for the disc to snap back left if thrown too hard."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat to slight hyzer",
+        "disc_explanation": "Overstable driver thrown flat carries distance then fades hard left at the end, producing a long left finish.",
+        "aim_point": "10-20 feet right of target depending on distance",
+        "tips": [
+          "More power = more distance before the fade kicks in.",
+          "Slight hyzer release accelerates the fade earlier if needed.",
+          "Avoid anhyzer — overstable discs will fight it and still fade left."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Understable driver on anhyzer turns right and carries long before fading back left slightly. For a true long-right finish, keep anhyzer aggressive.",
+        "aim_point": "Left of target by 15-25 feet",
+        "tips": [
+          "High arm speed maximizes the turn.",
+          "If disc comes back too much, increase anhyzer angle.",
+          "Best thrown on a slight downslope for maximum right carry."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Understable driver thrown flat will turn right (the S's first curve) then fade back left (the return). Perfect S-curve flight.",
+        "aim_point": "Slightly left of target — let the disc work back to center",
+        "tips": [
+          "This is the money shot for understable discs.",
+          "A stable disc at high speed can also produce a mild S-curve.",
+          "Great for getting around obstacles on both sides."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat to slight anhyzer",
+        "disc_explanation": "Understable driver maximizes glide and distance potential by turning slightly right and floating longer before fading.",
+        "aim_point": "Slightly left of landing zone to account for fade",
+        "tips": [
+          "Higher release angle (not too much anhyzer) adds height and hang time.",
+          "Match disc stability to your arm speed — overpowering understable discs loses control.",
+          "Hyzer-flip technique: throw understable on hyzer so it flips flat and glides far."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Stable putter on a flat release gives the most predictable flight to the basket. No wind means no compensation.",
+        "aim_point": "Center of chains",
+        "tips": [
+          "Keep your release consistent and repeatable.",
+          "Follow through toward the basket.",
+          "Overstable putters are better for longer putts where wind can creep in."
+        ]
       }
-    } else {
-      if (!discChanged && !angleChanged) {
-        summaryPrefix = 'Already at minimum stability — use the flippiest understable disc available on maximum anhyzer. ';
-        tipNote = 'Downhill adds overstable/fade force and you are already at the stability floor. Use the most understable disc you own, tilt to maximum anhyzer, and plan for significantly more distance than flat ground.';
-      } else {
-        const what = [discChanged && `${newDisc} disc`, angleChanged && `${newAngle} release`].filter(Boolean).join(' with ');
-        summaryPrefix = `Downhill adds fade — using ${what} to compensate. `;
-        const why = [
-          discChanged  && `stepped down from ${r.disc} to ${newDisc} because downhill makes discs act more overstable`,
-          angleChanged && `${newAngle === 'anhyzer' ? 'opened to anhyzer' : 'released flatter'} to fight the extra fade`,
-        ].filter(Boolean).join('; ');
-        tipNote = `Downhill adjustment: ${why}. Disc will fly noticeably farther than on flat ground — account for this in your landing zone.`;
+    },
+    "uphill": {
+      "straight": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill shots naturally produce more lift and the disc acts more understable. A stable mid compensates and stays on line.",
+        "aim_point": "Directly at target",
+        "tips": [
+          "The uphill grade makes the disc feel like it has more turn — account for this.",
+          "Use slightly more overstable than you think you need.",
+          "Power up slightly to maintain disc speed through the climb."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "overstable"
+        },
+        "angle": "flat to hyzer",
+        "disc_explanation": "Uphill fights overstability slightly, so a more overstable disc on flat-to-hyzer will still reliably fade left.",
+        "aim_point": "Right of target by 5-10 feet",
+        "tips": [
+          "Don't be afraid of the overstable — the uphill neutralizes some of the fade.",
+          "Hyzer angle locks in the left finish regardless of grade."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Uphill + anhyzer on a stable disc turns right reliably since uphill encourages turn already.",
+        "aim_point": "Left of target by 5-10 feet",
+        "tips": [
+          "Be careful not to overdo the anhyzer — uphill amplifies the turn.",
+          "Understable disc + uphill + anhyzer can get away from you fast."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill neutralizes some overstability. A flat overstable driver carries up and fades hard left at end.",
+        "aim_point": "15-20 feet right of target",
+        "tips": [
+          "Power through the shot — distance is reduced uphill.",
+          "The fade will still happen, just slightly later than on flat ground."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Uphill + understable + anhyzer gives a strong right-turning flight that holds the anhyzer angle longer.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Be very mindful of over-turning — this combo is aggressive.",
+          "A stable disc on anhyzer uphill might be the safer play."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Stable driver uphill turns slightly right (uphill amplifies), then fades back left for an S-curve. No need for understable here.",
+        "aim_point": "Slightly left of target",
+        "tips": [
+          "The grade does some of the work — choose slightly more stable than flat ground.",
+          "Understable uphill can over-turn into a full roller or extreme right finish."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill costs distance. A stable driver maximizes distance by flying straight with minimal unnecessary fade.",
+        "aim_point": "Slightly left of landing zone",
+        "tips": [
+          "Add 10-20% more power to compensate for uphill distance loss.",
+          "Don't overshoot with an understable disc — the uphill amplifies the turn."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill putts require more power. Stable putter stays on line with added power without fading unpredictably.",
+        "aim_point": "High center of chains — the disc will drop as it climbs",
+        "tips": [
+          "Aim higher on the basket than normal.",
+          "Follow through aggressively — it's easy to come up short uphill.",
+          "Overstable putter for windy uphill putts; stable for calm."
+        ]
+      }
+    },
+    "downhill": {
+      "straight": {
+        "disc": {
+          "category": "mid",
+          "stability": "overstable"
+        },
+        "angle": "flat to hyzer",
+        "disc_explanation": "Downhill makes discs act more overstable. Use an overstable mid to fight this tendency and fly straighter.",
+        "aim_point": "Directly at target",
+        "tips": [
+          "Power down slightly — discs carry farther downhill.",
+          "Overstable keeps the disc on line when the downhill grade wants to push it left."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Downhill already promotes fade. An overstable putter on hyzer locks in a reliable left finish at short range.",
+        "aim_point": "Right of target",
+        "tips": [
+          "This combo fades reliably — don't overthrow.",
+          "The downhill slope acts like a hyzer booster."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "understable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Downhill promotes overstability, so understable + anhyzer counters that tendency and produces a right finish.",
+        "aim_point": "Left of target",
+        "tips": [
+          "The understable disc fights the downhill overstability — they cancel out somewhat.",
+          "Watch for the disc to snap back left if the disc runs out of speed downhill."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Downhill + hyzer on a stable driver produces a strong left-finishing shot with good distance.",
+        "aim_point": "20+ feet right of target",
+        "tips": [
+          "Don't use overstable — downhill already adds effective overstability.",
+          "Hyzer angle + grade = reliable hard fade."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill naturally promotes overstability, so understable on flat counters this and produces a right-biased flight.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Flat or slight anhyzer — downhill fights overstability.",
+          "Watch for the disc to come back hard left at the end if understability runs out."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Downhill + overstable + anhyzer: the disc turns right (anhyzer/speed), then overstability fights back for a left fade — classic S-curve.",
+        "aim_point": "Slightly left of where you want to land",
+        "tips": [
+          "This is an advanced shot — the disc needs enough speed to hold the anhyzer before fading.",
+          "Power down slightly — downhill adds speed."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill adds significant distance. Overstable driver prevents runaway turns and keeps the disc on a controlled long flight.",
+        "aim_point": "Slightly left of landing zone",
+        "tips": [
+          "Power down 10-20% — downhill does the work.",
+          "Overstable prevents the disc from turning over on the extended flight."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill putts fly farther and can fade more than expected. Overstable putter stays on line at lower speeds.",
+        "aim_point": "Lower center of chains — the disc carries farther than expected",
+        "tips": [
+          "Power down — it's easy to overshoot downhill putts.",
+          "Aim at the base of the chains, not the center.",
+          "Overstable resists unexpected fades at the end of the putt."
+        ]
       }
     }
+  },
+  "headwind": {
+    "flat": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat to slight hyzer",
+        "disc_explanation": "Headwind amplifies lift and makes the disc act more understable. Overstable driver fights the wind's tendency to flip the disc.",
+        "aim_point": "Directly at target",
+        "tips": [
+          "Power down — headwinds add lift and the disc floats unpredictably at full power.",
+          "Lower release angles cut through the wind better — avoid high loft.",
+          "Grip firm to prevent wobble at release."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Headwind amplifies fade. Overstable mid on hyzer reliably dumps left early in the flight.",
+        "aim_point": "Right of target",
+        "tips": [
+          "This is a safe, controlled shot — headwind + hyzer + overstable is very predictable.",
+          "Don't power up into the wind — it will fight you."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "slight anhyzer",
+        "disc_explanation": "Headwind wants to flip the disc, so a stable disc on slight anhyzer uses the wind's flipping force to go right before fading back.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Don't use understable in a headwind anhyzer — it will turn over wildly.",
+          "This shot requires precision — the headwind makes anhyzer risky."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Headwind + overstable + hyzer = strong left finish with controlled distance. The most reliable long-left shot in a headwind.",
+        "aim_point": "20+ feet right of target",
+        "tips": [
+          "Power down 20-30% in a headwind — the disc will still travel.",
+          "Low release to cut under the wind."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Headwind amplifies turning. A stable driver on anhyzer turns right aggressively and carries. Don't use understable — it will flip.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "This is a risky shot in a strong headwind — consider whether it's necessary.",
+          "Watch power — headwind amplifies turn unpredictably."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "slight anhyzer",
+        "disc_explanation": "Overstable on anhyzer in a headwind: disc turns right due to anhyzer/headwind lift, then overstability fights back for a left fade.",
+        "aim_point": "Slightly left of target",
+        "tips": [
+          "Advanced shot — headwind makes this difficult to control.",
+          "A stable disc might produce a more reliable S-curve here."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Distance is compromised in a headwind. Overstable driver keeps the disc from flipping while maximizing controlled distance.",
+        "aim_point": "Left of landing zone to account for fade",
+        "tips": [
+          "Low line — punch the disc through the wind, don't loft it.",
+          "Accept 20-40% distance loss. Control beats distance in a headwind.",
+          "Hyzer-flip with an overstable disc is an option for extra distance."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind slows the putt and can push it off-line. Overstable putter maintains its line and fights the wind.",
+        "aim_point": "High on chains — wind will push the disc down",
+        "tips": [
+          "Step closer if legal — headwind putts are one of the hardest shots.",
+          "Drive through the putt. Commit fully.",
+          "Aim higher than normal to compensate for wind drag."
+        ]
+      }
+    },
+    "uphill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind + uphill = double understable effect on the disc. Overstable driver fights both forces to fly straight.",
+        "aim_point": "Directly at target",
+        "tips": [
+          "This is the hardest condition to throw straight in.",
+          "Power up slightly for the uphill, but controlled — headwind fights you.",
+          "Punch through with a low, flat release."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Both headwind and uphill encourage understability. Overstable + hyzer locks in the left fade despite both factors.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Trust the disc — hyzer + overstable will fade left reliably.",
+          "Power through for uphill distance."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind + uphill both push disc toward understable behavior. A flat overstable mid resists the flip and lands in a mild right position.",
+        "aim_point": "Left of target slightly",
+        "tips": [
+          "True short-right shots are very difficult uphill into a headwind.",
+          "Work with the conditions and try anhyzer very carefully."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Overstable driver on hyzer into a headwind uphill — the most controlled long-left option in tough conditions.",
+        "aim_point": "20+ feet right of target",
+        "tips": [
+          "This is a grind shot — expect reduced distance.",
+          "Consistent hyzer angle is key. Stay low and punch through."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Headwind + uphill will flip the disc right aggressively. A stable driver on anhyzer rides this flip for a long-right flight.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Very risky — easy to turn over completely.",
+          "Only attempt if you need this line — otherwise layup."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Uphill + headwind flip the disc right first, then overstability brings it back left for an S-curve.",
+        "aim_point": "Left of intended landing",
+        "tips": [
+          "The headwind and uphill do the turning — use them.",
+          "Power through to maintain disc speed uphill."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Distance is severely limited. Overstable driver maximizes what distance is achievable without flipping.",
+        "aim_point": "Left of landing zone",
+        "tips": [
+          "Accept reduced distance. Control and placement matter more.",
+          "Low release to cut through the headwind.",
+          "Extra power for uphill, but don't sacrifice disc angle."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill + headwind means you must drive through the putt with power. Overstable putter won't deflect off-line.",
+        "aim_point": "High center of chains",
+        "tips": [
+          "Commit fully and punch it — the wind and uphill both steal momentum.",
+          "Aim higher than you think. The headwind kills elevation fast.",
+          "Overstable putter prevents last-second deflection."
+        ]
+      }
+    },
+    "downhill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind wants to flip, downhill adds stability — opposing forces. Overstable driver threads the middle.",
+        "aim_point": "Directly at target",
+        "tips": [
+          "Power down — downhill + headwind combo adds distance anyway.",
+          "Flat release gives the best controlled flight."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill adds stability, headwind adds lift — overstable mid on flat finds the left finish balance.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Don't over-hyzer — downhill and overstable are already fading left.",
+          "Power down — disc travels far downhill."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Headwind flips the disc toward right, downhill adds stability. Stable disc on anhyzer finds the middle ground for a right finish.",
+        "aim_point": "Left of target",
+        "tips": [
+          "The headwind's flipping force works in your favor here.",
+          "Downhill prevents the flip from getting out of control."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Downhill + headwind + overstable + hyzer = very strong left finish with extended distance from the downhill.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "Power way down — this combo produces a very long flight.",
+          "Watch for the disc to fade sharply early in a strong headwind."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind flips the disc right, downhill extends flight. Understable on flat rides both forces for a long right flight.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Risky — headwind + understable can turn over violently.",
+          "Use stable disc instead if conditions are severe."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind flips disc toward right early in flight (first S curve), then as speed drops downhill, the stable disc fades left.",
+        "aim_point": "Slightly left of target",
+        "tips": [
+          "Let the headwind be your turning force.",
+          "The disc must have enough speed for the turn — don't power down too much."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill adds distance, headwind steals it back — these roughly cancel. Overstable maximizes controlled distance while preventing turn-over.",
+        "aim_point": "Left of landing zone",
+        "tips": [
+          "These two forces roughly cancel — treat it like a flat headwind shot.",
+          "Low release, firm grip."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill extends the putt distance, headwind fights it. Overstable putter stays on line.",
+        "aim_point": "Center to slightly high chains",
+        "tips": [
+          "Power through the headwind.",
+          "Downhill makes it easy to be short — commit to the putt.",
+          "Overstable prevents unexpected deflection."
+        ]
+      }
+    }
+  },
+  "tailwind": {
+    "flat": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind reduces effective stability — the disc acts more understable. Overstable driver compensates and flies straight.",
+        "aim_point": "Directly at target",
+        "tips": [
+          "Tailwind helps distance but can cause understable discs to flip wildly.",
+          "Use one step up in overstability from what you'd throw in calm conditions.",
+          "Release at slightly less power — the wind adds speed for you."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Tailwind reduces overstability. A stable mid on hyzer gives the reliable left fade that an overstable disc would in calm conditions.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Don't reach for overstable — the tailwind already helps the fade.",
+          "Hyzer angle + tailwind speed = reliable left finish."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Tailwind amplifies turn — understable on anhyzer produces an exaggerated right finish. Great shot when you need to go right fast.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Power down — tailwind already adds speed.",
+          "Watch for the disc to over-turn past your target."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat to hyzer",
+        "disc_explanation": "Tailwind reduces stability. Stable driver on flat-to-hyzer flies far with a left fade. The tailwind adds distance.",
+        "aim_point": "Right of target",
+        "tips": [
+          "The tailwind does the work — don't overthrow.",
+          "A flat release lets the tailwind push the disc for maximum carry."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat to anhyzer",
+        "disc_explanation": "Tailwind + understable + anhyzer is a distance monster to the right. The disc turns hard right and carries extremely far.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Be very careful of over-turning — this combo can produce a turnover.",
+          "Use a stable disc if the wind is strong and you need the shot to come back."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind makes disc act understable. An overstable driver on flat turns slightly right first (from tailwind effect), then fades back left.",
+        "aim_point": "Left of target",
+        "tips": [
+          "The tailwind creates the S's first curve automatically.",
+          "Let the disc's fade bring it back — don't force the turn."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind is your best distance friend. Understable driver on flat + tailwind = maximum distance. Disc glides far before fading.",
+        "aim_point": "Slightly left of landing zone for fade",
+        "tips": [
+          "Best conditions for distance records.",
+          "Power down slightly — let the wind do the work.",
+          "Watch for turnover — the tailwind can push understable discs past the point of recovery."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind pushes the disc through — overstable putter won't be pushed past the basket and stays on line.",
+        "aim_point": "Lower center of chains — tailwind carries it further than you think",
+        "tips": [
+          "Aim lower — the disc will carry farther than normal.",
+          "Power down on your putt — tailwind adds momentum.",
+          "Overstable prevents the tailwind from pushing the disc past the chains."
+        ]
+      }
+    },
+    "uphill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind reduces stability and uphill also promotes understability. Both combine — stable driver on flat is the right call.",
+        "aim_point": "Directly at target",
+        "tips": [
+          "Overstable might be needed in a strong tailwind uphill.",
+          "Power up for the uphill — the tailwind helps a little but not enough for climbing."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill + tailwind both reduce effective stability. Overstable mid on flat provides the left fade.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Uphill eats into the tailwind boost — power up.",
+          "Overstable fights both the uphill and tailwind understable effects."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill + tailwind both promote understability (right turn). Even a flat release with understable disc curves right reliably.",
+        "aim_point": "Left of target",
+        "tips": [
+          "You may not even need anhyzer — let the conditions do the work.",
+          "Watch for an aggressive turnover."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill + tailwind both fight stability. Overstable driver on flat overcomes both effects for a left-finishing long shot.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Power through — uphill costs distance and the tailwind doesn't fully compensate.",
+          "Trust the overstable fade."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill + tailwind are both understable forces. Understable driver on flat aggressively turns right and carries far.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "This is an aggressive combination — control is difficult.",
+          "Use stable if you need reliability."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Overstable driver in tailwind uphill: the combined understable forces turn it right first, then overstability fades it left.",
+        "aim_point": "Left of target",
+        "tips": [
+          "The conditions create the S without much help from you.",
+          "Stay flat — let the disc do the work."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill kills distance; tailwind gives some back. Stable driver maximizes efficient uphill distance without flipping.",
+        "aim_point": "Left of landing zone",
+        "tips": [
+          "Accept reduced distance — uphill + tailwind still means less than flat calm.",
+          "Stable disc prevents the double-understable conditions from flipping the disc."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill requires power, tailwind helps — stable putter balances both for a controlled putt.",
+        "aim_point": "High center of chains",
+        "tips": [
+          "The tailwind helps push the disc uphill — aim high and commit.",
+          "Stable prevents unpredictable late fade."
+        ]
+      }
+    },
+    "downhill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill adds stability, tailwind reduces it — they partially cancel. Overstable driver leans into the downhill's natural stability to fly straight.",
+        "aim_point": "Directly at target",
+        "tips": [
+          "Power way down — tailwind + downhill adds massive distance.",
+          "Overstable prevents the tailwind from flipping the disc on a long downhill carry."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Downhill adds extra distance and stability. Stable driver on hyzer produces a reliable left fade before the disc carries too far.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Power way down — this can go very far.",
+          "Hyzer angle ensures the left finish before the disc runs out."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind promotes right turn; downhill extends the flight. Understable on flat glides right for a while.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Tremendous distance risk — this combo carries very far.",
+          "Consider a mid disc for more control on short shots."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + downhill = huge distance. Stable driver fades left naturally. Don't need overstable — the distance does it.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "Power way down — distance is almost automatic here.",
+          "Let the disc's natural fade bring it left at the end."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat to anhyzer",
+        "disc_explanation": "Tailwind + downhill + understable = maximum right carry. This is an extreme distance shot to the right.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Extreme distance potential — placement is the challenge.",
+          "Stable disc if you need more control."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind makes stable disc act understable (right turn first). Downhill extends the flight, then stable fade brings it left — long S-curve.",
+        "aim_point": "Slightly left of target",
+        "tips": [
+          "Great distance S-curve conditions.",
+          "Power down — tailwind + downhill = maximum carry."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Maximum distance conditions. Overstable prevents flip-over on the extended carry. Tailwind + downhill = furthest possible controlled flight.",
+        "aim_point": "Left of landing zone to account for fade",
+        "tips": [
+          "Best possible distance conditions.",
+          "Power down significantly — let the conditions work for you.",
+          "Overstable is critical to prevent a turnover in this combo."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + downhill = way too much power gets to the disc. Overstable putter resists being pushed past the basket.",
+        "aim_point": "Low chains — disc will carry much farther than expected",
+        "tips": [
+          "Power way down — this putt will fly.",
+          "Aim at the bottom of the basket.",
+          "Overstable prevents the tailwind from carrying the disc past the chains."
+        ]
+      }
+    }
+  },
+  "left_to_right": {
+    "flat": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Left-to-right wind pushes the disc right. Overstable driver's natural left fade counters the rightward push to maintain a straight flight.",
+        "aim_point": "Slightly left of target — let the wind and fade cancel each other",
+        "tips": [
+          "Aim into the wind — left of target — and let it drift to center.",
+          "Overstable fade cancels the wind push for a net-straight flight.",
+          "Strong L-to-R wind: aim further left and use more overstable."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Left-to-right wind works against a left finish. Overstable on hyzer forces the left finish despite the rightward push.",
+        "aim_point": "Well right of target — wind pushes left finish back left",
+        "tips": [
+          "Aim much further right than you think.",
+          "The wind pushes right, the overstable hyzer pulls left — aim for the middle.",
+          "Strong wind may require aiming almost entirely into the wind."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Left-to-right wind naturally pushes the disc right — use a stable mid and let the wind do the right-curve work for you.",
+        "aim_point": "Left of target — wind drifts disc right",
+        "tips": [
+          "The wind is your friend for right shots — don't fight it.",
+          "No anhyzer needed — the wind handles the right drift.",
+          "Understable disc would over-turn."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Left-to-right wind fights the left finish. Overstable + hyzer ensures the disc beats the wind and finishes left.",
+        "aim_point": "Far right of target — you're fighting the wind all the way",
+        "tips": [
+          "This is a difficult shot — you're fighting the wind the whole flight.",
+          "Aim well into the wind and expect a longer carry due to wind resistance."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Left-to-right wind + understable disc = aggressive right push. Wind adds to the understable turn for a long right flight.",
+        "aim_point": "Left of target — wind and understability push it right",
+        "tips": [
+          "The wind works with you on this shot — aim left and let it carry right.",
+          "Easy to over-turn — stable disc might be safer."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Left-to-right pushes disc right first (first S curve), then overstable fade brings it left. Natural S-curve from wind conditions.",
+        "aim_point": "Slightly left of target",
+        "tips": [
+          "The L-to-R wind creates the S's right curve without a special throw.",
+          "Overstable ensures the fade brings it back left."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Left-to-right wind has less effect on distance than head/tailwind. Stable driver with slight overstability prevents the disc from pushing too far right.",
+        "aim_point": "Slightly left of landing zone",
+        "tips": [
+          "Adjust aim left by the amount of wind drift you expect.",
+          "Use a stable to slightly overstable disc to maintain the line."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Left-to-right wind pushes the putt right. Overstable putter fights the drift and stays on a left-biased line.",
+        "aim_point": "Left of center chains — let the wind drift it to center",
+        "tips": [
+          "Aim left of the basket center.",
+          "Overstable putter fights the rightward push.",
+          "Shorter stance in crosswind for better balance."
+        ]
+      }
+    },
+    "uphill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill adds understable effect; L-to-R pushes right. Double right-push conditions — overstable counters both.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Aim left — both uphill and wind push right.",
+          "Overstable driver is essential here."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Uphill + L-to-R = double right push. Overstable hyzer fights both for a left finish.",
+        "aim_point": "Well right of target",
+        "tips": [
+          "This is a tough shot — overstable hyzer is essential.",
+          "Power up for uphill."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill + L-to-R wind both encourage right. Stable disc on flat rides both forces right without needing anhyzer.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Let the conditions do the work.",
+          "Very little disc manipulation needed — the forces push right naturally."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Three forces to fight: uphill, L-to-R, long distance. Overstable hyzer is the only answer.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "This may not be achievable in strong wind — consider a safer line.",
+          "Power through both the uphill and wind."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill + L-to-R + understable = three right-pushing forces. This disc will go far right — control carefully.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Extreme right push — very difficult to control.",
+          "Stable disc might be more reliable here."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Wind and uphill push right first (S start), then overstable fight brings it left at end.",
+        "aim_point": "Left of target",
+        "tips": [
+          "The conditions create the S naturally.",
+          "Power through for uphill."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill + L-to-R both push right. Overstable keeps disc on a forward line, preventing a hard right drift.",
+        "aim_point": "Left of landing zone",
+        "tips": [
+          "Accept reduced distance uphill.",
+          "Aim left and power through."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill + L-to-R = power-up putt with wind drift. Overstable putter compensates for both.",
+        "aim_point": "High left chains",
+        "tips": [
+          "Aim high and left — uphill needs height, wind drifts right.",
+          "Commit and power through."
+        ]
+      }
+    },
+    "downhill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill adds stability, L-to-R pushes right — they partially offset. Overstable driver stays straight.",
+        "aim_point": "Slightly left of target",
+        "tips": [
+          "Power way down — downhill + wind = lots of distance.",
+          "Aim slightly left to compensate for wind drift."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Downhill adds stability to the disc (helps the left fade), but L-to-R fights it. Stable + hyzer finds the left finish.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Power down — downhill does a lot of work.",
+          "Hyzer + downhill stability produces reliable left fade."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "L-to-R pushes right, downhill extends flight. Understable on flat curves right and carries.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Power way down — this carries very far downhill.",
+          "Mid disc gives more control for a short-right downhill shot."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "L-to-R fights a long-left shot. Downhill helps. Overstable + hyzer + downhill stability = left finish despite the wind.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "The downhill helps you on this shot.",
+          "Aim well right and let the hyzer and downhill bring it left."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "L-to-R pushes right, downhill extends. Understable disc carries far right — big sweeping right shot.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Extreme distance and right carry.",
+          "Power way down."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "L-to-R turns disc right first (S start). Downhill extends flight. Stable disc fades left at end for the return curve.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Great S-curve conditions.",
+          "Power down — distance is not an issue downhill."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill + L-to-R = lots of distance potential with right drift. Overstable prevents the drift from becoming a turnover.",
+        "aim_point": "Left of landing zone",
+        "tips": [
+          "Best to aim left and let the wind drift it to center.",
+          "Power way down."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill putt carries far, L-to-R drifts right. Overstable putter fights both for a reliable line.",
+        "aim_point": "Left of center, lower chains",
+        "tips": [
+          "Aim left of the basket — wind drifts right.",
+          "Power way down — downhill + L-to-R carries far."
+        ]
+      }
+    }
+  },
+  "right_to_left": {
+    "flat": {
+      "straight": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L wind pushes disc left, which aligns with the natural fade of a stable disc. Aim right and let the wind drift it back to center.",
+        "aim_point": "Slightly right of target — wind pushes disc back left to target",
+        "tips": [
+          "Aim slightly right and let the wind drift it to center.",
+          "R-to-L is forgiving for RHBH players since it works with the natural fade.",
+          "Understable disc risks over-fading left."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L pushes disc left. Stable disc on flat adds natural fade to wind push for a reliable left finish.",
+        "aim_point": "Right of target — wind and fade both push left",
+        "tips": [
+          "Easy shot in R-to-L wind — the wind works with your natural fade.",
+          "Don't over-aim right — the combined force can push past your target."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L wind fights a right finish. Overstable disc's strong fade fights the wind push left, landing in a middle-right position.",
+        "aim_point": "Far left of target — fight the wind",
+        "tips": [
+          "Very difficult shot in R-to-L wind — going right against the wind.",
+          "Anhyzer + understable disc is extremely risky here — avoid.",
+          "Consider whether this shot is necessary or if there's a safer line."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L wind amplifies left finish. Understable disc turns slightly right then fades left, and the wind exaggerates the left finish for a long-left flight.",
+        "aim_point": "Right of target — combined wind and fade goes far left",
+        "tips": [
+          "Be careful of the disc going too far left.",
+          "Stable disc might be the safer call in stronger R-to-L wind."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "R-to-L fights a right finish. Overstable on anhyzer starts right (anhyzer) and the wind pushes it back left — controlled flex shot.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Difficult shot — the wind works against you the whole way.",
+          "Stable on anhyzer is very risky — disc won't recover and goes too far right."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Understable on anhyzer starts right (first curve of S), then R-to-L wind pushes it left while the understable fade also brings it left.",
+        "aim_point": "Left of intended landing area",
+        "tips": [
+          "Wind works against the S-curve — power up slightly to maintain disc speed.",
+          "Stable disc + anhyzer is a safer option for an S-curve in R-to-L."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L wind pushes disc left. Overstable driver fights the drift for maximum forward distance.",
+        "aim_point": "Right of landing zone — wind drifts left",
+        "tips": [
+          "Aim right of your intended landing zone.",
+          "R-to-L doesn't reduce distance as much as a headwind.",
+          "Use overstable to prevent the disc from drifting too far left."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L wind drifts the putt left. A stable putter combined with aiming right compensates for the drift.",
+        "aim_point": "Right of center chains — let wind drift to center",
+        "tips": [
+          "Aim right of the basket — wind drifts it left to center.",
+          "Overstable putter if the wind is strong.",
+          "Consistent follow-through fights the wind drift."
+        ]
+      }
+    },
+    "uphill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L pushes left, uphill promotes understability (right turn) — these partially cancel. Overstable driver in the middle keeps flight straight.",
+        "aim_point": "Slightly right of target",
+        "tips": [
+          "The two forces partially cancel — overstable leans toward the wind.",
+          "Power up for uphill."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L pushes left, uphill adds understable effect. Stable disc finds the balance for a reliable short-left finish.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Wind and fade work together — easy left finish.",
+          "Power up for uphill."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L and uphill both push left — going right requires strong overstable to fight these forces.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Very difficult shot — consider alternative line.",
+          "Overstable fights both the uphill turn and R-to-L drift."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L + natural disc fade both go left. Uphill partially offsets. Stable driver carries left reliably.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Wind and fade make this easy — aim right and let it go left.",
+          "Power through for uphill."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "R-to-L fights right, but uphill adds some understable help. Overstable on anhyzer balances the forces for a long-right finish.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Uphill helps the right turn slightly.",
+          "Still difficult — overstable is needed to prevent a snap-back left at the end."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill turns disc right (S start), R-to-L fights that, then disc fades left at the end for a mild S-curve.",
+        "aim_point": "Slightly right of target",
+        "tips": [
+          "The uphill creates the S's right curve — let it.",
+          "R-to-L brings it back left with the disc's natural fade."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill reduces distance; R-to-L adds wind resistance on the left side of the disc. Overstable on flat maximizes forward carry.",
+        "aim_point": "Right of landing zone",
+        "tips": [
+          "Tough distance conditions — uphill + crosswind from right.",
+          "Power up and keep flat."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill + R-to-L drift. Stable putter with aim compensation covers both factors.",
+        "aim_point": "High right chains",
+        "tips": [
+          "Aim high (uphill) and right (wind drift).",
+          "Power through both factors."
+        ]
+      }
+    },
+    "downhill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill adds overstable effect, R-to-L pushes left — both promote left finish. Stable disc on flat cuts through both for a straight flight.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Aim right — both downhill overstability and wind push left.",
+          "Power way down — enormous distance potential."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L pushes left; downhill adds fade. Understable on flat counters downhill overstability for a controlled left finish at the right distance.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Power way down — downhill + wind = big distance.",
+          "Understable prevents excessive fade."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Both downhill and R-to-L fight a right finish. Overstable + anhyzer fights both forces to curve right.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Very tough shot in these conditions — consider a different line.",
+          "Power down — downhill amplifies everything."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L + downhill overstability both push left. Understable counteracts downhill overstability while R-to-L carries the disc left for the finish.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Wind does the left work — understable prevents over-fade.",
+          "Power way down."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Downhill + R-to-L both fight right. Overstable + anhyzer makes it possible but is a challenging flex shot.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "One of the hardest shot shapes in these conditions.",
+          "Consider a safer line if possible."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill + overstable on flat: fast disc speed holds the flat angle early (mild right from speed), then fades left hard. R-to-L amplifies the left finish.",
+        "aim_point": "Right of target",
+        "tips": [
+          "R-to-L adds to the S's left return — exaggerated left finish.",
+          "Power way down."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill + R-to-L both carry disc far with a left bias. Stable driver maximizes distance while keeping the disc from drifting too far left.",
+        "aim_point": "Right of landing zone",
+        "tips": [
+          "Power way down — enormous distance potential.",
+          "Aim well right to compensate for leftward carry."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Downhill + R-to-L both push the putt left. Overstable putter fights the combined left drift.",
+        "aim_point": "Right of center, lower chains",
+        "tips": [
+          "Aim right of the basket — wind and downhill drift left.",
+          "Power way down — the putt will carry far downhill."
+        ]
+      }
+    }
+  },
+  "headwind_left_to_right": {
+    "flat": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind flips disc and L-to-R pushes right. Double right-pushing forces. Overstable driver counters both to fly straight.",
+        "aim_point": "Left of target — both forces push right",
+        "tips": [
+          "Headwind + L-to-R is a tough combination — overstable is essential.",
+          "Power down and punch low through the wind.",
+          "Aim well left — both wind forces push right."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Both wind forces push right, fighting the left finish. Overstable + hyzer overcomes both for a left finish.",
+        "aim_point": "Well right of target",
+        "tips": [
+          "Hyzer + overstable is essential against these wind forces.",
+          "Expect a shorter shot — fighting two wind directions costs distance."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Both wind forces push right — stable disc on flat rides both forces for an easy right finish without special disc or angle.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Wind does the work — minimal manipulation needed.",
+          "Understable disc risks extreme over-turn."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Both wind forces fight the left finish. Maximum overstable + hyzer needed.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "This is a very difficult shot in these conditions.",
+          "Consider a safer line — fighting two wind directions for a left finish is challenging."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Both wind forces push right — stable disc on flat carries far right with the wind help.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Wind does the right work — don't overthrow.",
+          "Understable disc risks severe flip in the headwind."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind + L-to-R both flip/push right (first S curve), then overstable fades left. S-curve driven by the wind.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Wind creates the right curve naturally — let it happen.",
+          "Overstable fade brings it back left at the end."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind reduces distance significantly. L-to-R adds rightward drift. Overstable prevents flip for maximum controlled distance.",
+        "aim_point": "Left of landing zone",
+        "tips": [
+          "Accept major distance reduction from headwind.",
+          "Aim left — L-to-R drifts it right.",
+          "Low punch shot cuts through the wind."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind slows the putt, L-to-R drifts right. Overstable putter fights both forces.",
+        "aim_point": "High left of chains",
+        "tips": [
+          "Power through the headwind.",
+          "Aim left — wind drifts it right to center.",
+          "These are difficult putting conditions."
+        ]
+      }
+    },
+    "uphill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three right-pushing forces: headwind, L-to-R, uphill understability. Maximum overstable needed to fly straight.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Worst conditions for a straight shot — overstable is critical.",
+          "Power way up for uphill, but low release to fight headwind."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Three forces push right. Overstable + hyzer fights all three for a left finish.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "Maximum difficulty for a left shot.",
+          "Power through — uphill + headwind both cost distance."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three right-pushing forces. Stable disc needs no special manipulation — the forces do the right work.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Wind, uphill, and headwind all push right — easy right shot.",
+          "Control is the challenge, not getting it right."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Maximum difficulty — three forces fight left. Only the most overstable disc on hyzer has a chance.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "May not be achievable in strong conditions — consider a layup.",
+          "Power way through but accept a short shot."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three right forces. Stable disc rides the wind and conditions for a strong right flight.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Easiest right shot ever — three forces work for you.",
+          "Understable disc risks extreme flip in headwind + uphill."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three right forces create a strong first right curve, then overstable fights back left.",
+        "aim_point": "Left of target",
+        "tips": [
+          "S-curve is almost automatic in these conditions with an overstable disc.",
+          "Power through for uphill carry."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three factors reduce distance or cause drift. Overstable maximizes controlled forward distance.",
+        "aim_point": "Left of landing zone",
+        "tips": [
+          "Worst distance conditions — three factors work against you.",
+          "Low punch, firm grip, overstable."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three factors fight the putt. Overstable putter with maximum commitment fights all three forces.",
+        "aim_point": "High left chains",
+        "tips": [
+          "Step closer if possible.",
+          "Power through all three factors.",
+          "These are extremely difficult putting conditions."
+        ]
+      }
+    },
+    "downhill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind + L-to-R push right; downhill adds stability (helps somewhat). Overstable driver balances all factors.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Downhill partially offsets the two wind forces.",
+          "Power down — downhill gives distance even in a headwind."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat to hyzer",
+        "disc_explanation": "Two wind forces push right; downhill helps left fade. Overstable + slight hyzer finds the left finish.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Downhill helps the left fade — use it.",
+          "Power down — downhill does the distance work."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind + L-to-R push right. Downhill adds stability as a counter. Stable disc with flat release finds a right finish.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Let the wind do the right work.",
+          "Power down — downhill extends carry."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Downhill helps the left fade but two wind forces fight it. Overstable + hyzer + downhill stability = achievable left shot.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Downhill is your ally here — use its stability for the left fade.",
+          "Power down."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind + L-to-R push right. Downhill extends flight. Stable disc rides the wind right with good carry.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Wind pushes right, downhill extends — effective long-right shot.",
+          "Power down significantly."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Wind forces push right (S start), downhill + overstability brings it back left.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Downhill extends the S-curve for a longer flight.",
+          "Power down."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind reduces distance; downhill gives it back. L-to-R drifts right. Overstable prevents flip for maximum controlled distance.",
+        "aim_point": "Left of landing zone",
+        "tips": [
+          "Headwind and downhill partially cancel — net moderate distance.",
+          "Aim left for the rightward drift."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind fights; downhill carries far; L-to-R drifts right. Overstable handles all three.",
+        "aim_point": "Left of center, low chains",
+        "tips": [
+          "Power through the headwind.",
+          "Aim left and low — downhill carries and wind drifts right."
+        ]
+      }
+    }
+  },
+  "headwind_right_to_left": {
+    "flat": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind promotes understability while R-to-L adds more left push. Overstable fights both for straight flight.",
+        "aim_point": "Right of target — both forces push left",
+        "tips": [
+          "Aim right — headwind flipping + R-to-L both push left.",
+          "Overstable driver is essential.",
+          "Low, punchy release."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind + R-to-L both promote left — stable disc on flat uses both forces for an easy left finish.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Wind does the left work — minimal disc manipulation.",
+          "Don't fight it — aim right and let both forces carry it left."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind + R-to-L both fight a right finish. Overstable disc on flat can achieve a mild right finish by resisting the extreme left forces.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Very difficult shot — going right into both headwind and R-to-L.",
+          "Anhyzer adds too much risk in headwind — avoid.",
+          "Consider a different line."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind flips right, R-to-L pushes left — the two partly cancel. Understable disc + R-to-L = reliable long left finish.",
+        "aim_point": "Right of target",
+        "tips": [
+          "R-to-L + understable natural fade = strong left finish.",
+          "Headwind reduces distance — power up."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Both forces fight a right finish. Overstable + anhyzer provides a right-curving flex shot that can beat both forces over long distance.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Difficult shot — power up to maintain disc speed into the headwind.",
+          "Headwind makes anhyzer risky — go overstable."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind flips disc slightly right early in flight (S start), then R-to-L + disc fade pushes it left.",
+        "aim_point": "Slightly right of target",
+        "tips": [
+          "Headwind creates the S's first curve — let it.",
+          "R-to-L + stable fade brings it left."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind destroys distance; R-to-L drifts left. Overstable maximizes controlled forward distance.",
+        "aim_point": "Right of landing zone",
+        "tips": [
+          "Accept major distance loss from headwind.",
+          "Aim right for the left drift.",
+          "Low punch shot."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind fights the putt; R-to-L drifts left. Overstable putter fights both and stays on line.",
+        "aim_point": "High right of chains",
+        "tips": [
+          "Power through — headwind kills momentum.",
+          "Aim right — R-to-L drifts left to center."
+        ]
+      }
+    },
+    "uphill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind promotes understability; uphill adds understability; R-to-L pushes left. Three left-pushing forces. Overstable fights all three.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Worst conditions for straight shots — maximum overstable needed.",
+          "Power way up for uphill + headwind.",
+          "Low and flat release."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three left-pushing forces. Even a stable mid on flat finishes reliably left with all three forces working together.",
+        "aim_point": "Well right of target",
+        "tips": [
+          "Easy left shot — three forces push left.",
+          "Power through for uphill."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three left forces make a right finish nearly impossible. Overstable disc might land slightly right of a hard-left finish.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Near impossible to go right in these conditions.",
+          "Strongly consider a different line."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three left forces. Even understable disc finishes far left. R-to-L wind carries it left, understable fade adds to it.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "Be careful of going too far left — three forces are strong.",
+          "Stable disc might be safer for control."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Three left forces fight right. Overstable + anhyzer + maximum power is the only chance at a right finish.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Extremely difficult — may not be possible in strong conditions.",
+          "Consider a layup."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind creates mild right flip early, then R-to-L + uphill + overstable all bring it left for a strong left finish.",
+        "aim_point": "Right of target",
+        "tips": [
+          "The S's left return is very exaggerated here — aim further right.",
+          "Power through uphill + headwind."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three forces reduce distance or drift left. Overstable maximizes controlled forward distance.",
+        "aim_point": "Right of landing zone",
+        "tips": [
+          "Severely reduced distance — all three forces cost you yards.",
+          "Low punch, overstable, maximum power."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three left forces fight the putt. Overstable + maximum commitment fights all three.",
+        "aim_point": "High right chains",
+        "tips": [
+          "Most difficult putting conditions — commit fully.",
+          "Step closer if possible.",
+          "Overstable and power through."
+        ]
+      }
+    },
+    "downhill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind + R-to-L push left. Downhill adds stability (somewhat right). Overstable balances all factors.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Downhill partially fights the left forces.",
+          "Power down — downhill does the distance work."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Two left forces + downhill stability. Stable disc on flat uses the wind forces for left finish without the downhill adding too much stability.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Wind does the left work, downhill extends the carry.",
+          "Power way down."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Two left forces + downhill stability. Overstable disc fights the left wind forces while downhill adds stability for a mild right finish.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Downhill adds overstable effect that helps resist the wind.",
+          "Still difficult — consider a different line."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L + headwind both push left; downhill extends distance. Stable disc rides the conditions for a long left flight.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Wind + downhill = huge left carry.",
+          "Power way down."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "Two left forces fight right. Downhill adds disc speed for more distance. Overstable + anhyzer makes it achievable.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Downhill speed helps the anhyzer hold longer.",
+          "Power down — downhill gives speed naturally."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind creates mild right flip early (S start). R-to-L + downhill stability + disc fade brings it back left strongly.",
+        "aim_point": "Right of target",
+        "tips": [
+          "The left return of the S is exaggerated by R-to-L + downhill.",
+          "Power down — downhill carries far."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind reduces forward distance; downhill gives it back. R-to-L drifts left. Overstable prevents drift while maximizing forward carry.",
+        "aim_point": "Right of landing zone",
+        "tips": [
+          "Net moderate distance — headwind + downhill cancel.",
+          "Aim right for the left drift."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Headwind fights; downhill carries; R-to-L drifts left. Overstable handles all three.",
+        "aim_point": "Right of center, low chains",
+        "tips": [
+          "Power through headwind.",
+          "Aim right and low — downhill carries and wind drifts left."
+        ]
+      }
+    }
+  },
+  "tailwind_left_to_right": {
+    "flat": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind reduces stability (more understable); L-to-R pushes right. Double right-pushing forces. Overstable counters both.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Both tailwind and L-to-R push right — overstable is critical.",
+          "Power down — tailwind adds distance.",
+          "Aim well left."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Two right forces fight the left finish. Stable disc + natural disc fade fights both for a left finish.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Stable disc fade is needed to counter the two right forces.",
+          "Overstable might be needed in strong conditions."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + L-to-R both push right. Understable disc on flat turns right with maximum ease — easy right shot.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Easiest right shot — wind does all the work.",
+          "Power down — tailwind + two forces can over-carry easily.",
+          "Stable disc is safer if you need control."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Two right forces fight the left finish. Overstable + hyzer needed to beat both forces for a left flight.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "Difficult shot in these conditions.",
+          "Tailwind helps distance even while fighting left."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + L-to-R both push right. Understable rides both for a massive long-right flight.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Extreme distance and right carry.",
+          "Power way down.",
+          "Stable disc for more control."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Two right forces create the S's first right curve naturally. Overstable fade brings it back left at the end.",
+        "aim_point": "Left of target",
+        "tips": [
+          "S-curve is almost effortless — conditions create the right curve.",
+          "Overstable must be strong enough to fade through both right forces."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind maximizes distance; L-to-R drifts right. Overstable prevents turnover while maximizing distance.",
+        "aim_point": "Left of landing zone",
+        "tips": [
+          "Great distance conditions with tailwind.",
+          "Aim left — L-to-R drifts disc right.",
+          "Overstable prevents the tailwind from flipping the disc."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind carries far; L-to-R drifts right. Overstable resists both pushes.",
+        "aim_point": "Left of center, lower chains",
+        "tips": [
+          "Power way down — tailwind carries the putt further.",
+          "Aim left — L-to-R drifts to center."
+        ]
+      }
+    },
+    "uphill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + L-to-R + uphill: three right-pushing forces. Maximum overstable to fly straight.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Three right forces — need maximum overstable.",
+          "Power up for uphill."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Three right forces fight left. Overstable + hyzer is mandatory.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "Maximum difficulty for left shots.",
+          "Power through uphill."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "mid",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three right forces. Stable disc needs minimal manipulation — conditions push right naturally.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "All three forces push right — easy right shot.",
+          "Control is the challenge."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Maximum difficulty — three right forces fight left. Only overstable + hyzer can work.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "May not be achievable in strong wind.",
+          "Consider a layup or different line."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three right forces + understable = extreme right carry.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Easiest long-right shot — three forces do the work.",
+          "Stable disc might be needed for control."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Three right forces create S's first right curve. Overstable fades left at end.",
+        "aim_point": "Left of target",
+        "tips": [
+          "S-curve is automatic — overstable handles the return.",
+          "Power through for uphill."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind helps uphill distance; L-to-R drifts right; uphill reduces it. Net moderate distance with right drift. Overstable prevents flip.",
+        "aim_point": "Left of landing zone",
+        "tips": [
+          "Tailwind helps the uphill carry.",
+          "Overstable prevents flip in tailwind."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Uphill needs power; tailwind helps; L-to-R drifts right. Overstable fights the drift.",
+        "aim_point": "High left chains",
+        "tips": [
+          "Tailwind helps uphill — don't over-power.",
+          "Aim high (uphill) and left (wind drift)."
+        ]
+      }
+    },
+    "downhill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + L-to-R push right; downhill adds distance. Overstable prevents runaway right drift on a long downhill carry.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Power way down — massive distance potential.",
+          "Aim left — both wind forces push right.",
+          "Overstable critical to prevent turnover."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Two right forces + downhill distance. Overstable + hyzer fights the right forces and uses downhill for distance.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Downhill carries the disc far — power way down.",
+          "Overstable + hyzer beats the right forces."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Two right forces + downhill = huge right and long carry. Understable amplifies all three factors.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Extreme right carry — power way down.",
+          "Mid disc gives more control on short shots."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "hyzer",
+        "disc_explanation": "Two right forces fight left; downhill extends distance. Overstable + hyzer achieves left finish with long carry.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "Downhill is your ally — use its distance for a long left shot.",
+          "Power way down."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Two right forces + downhill = maximum right distance. Understable rides all three for a massive right flight.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "This is a monster right shot.",
+          "Power way down."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Two right forces + downhill speed create the S's right curve. Overstable fades left for the return.",
+        "aim_point": "Left of target",
+        "tips": [
+          "S-curve is natural in these conditions with an overstable disc.",
+          "Power way down."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Maximum distance conditions. Overstable prevents flip on the long downhill + tailwind carry.",
+        "aim_point": "Left of landing zone",
+        "tips": [
+          "Best possible distance shot.",
+          "Aim left — both wind forces drift right.",
+          "Power way down."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + downhill carry far; L-to-R drifts right. Overstable fights all three factors.",
+        "aim_point": "Left of center, very low chains",
+        "tips": [
+          "Power way down — this putt will fly far.",
+          "Aim left and very low on the basket."
+        ]
+      }
+    }
+  },
+  "tailwind_right_to_left": {
+    "flat": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind reduces stability (right effect); R-to-L pushes left. These two forces partially cancel. Overstable accounts for the net left drift.",
+        "aim_point": "Slightly right of target",
+        "tips": [
+          "Tailwind + R-to-L partially cancel each other.",
+          "Overstable handles the net left drift.",
+          "Power down — tailwind still adds distance."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L pushes left; tailwind neutralizes some disc stability. Net left push. Stable disc fades left easily with R-to-L help.",
+        "aim_point": "Right of target",
+        "tips": [
+          "R-to-L + disc fade = easy left finish.",
+          "Power down — tailwind gives distance."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L pushes left; tailwind partially helps right. Overstable disc resists R-to-L push for a mild right finish.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Difficult right shot with R-to-L fighting you.",
+          "Tailwind's understable effect helps slightly.",
+          "Overstable prevents extreme left drift."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L + disc fade both push left; tailwind adds distance. Stable disc carries far left with the tailwind.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Great long-left conditions with the tailwind adding distance.",
+          "R-to-L + disc fade = reliable left finish."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "R-to-L fights right; tailwind adds distance. Overstable + anhyzer fights R-to-L with tailwind help for a long right shot.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Tailwind gives the distance needed for this shot.",
+          "Overstable prevents snap-back left at the end."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind makes disc act understable (first S curve right), then R-to-L + disc fade brings it back left. Natural S-curve.",
+        "aim_point": "Slightly right of target",
+        "tips": [
+          "Tailwind creates the right turn; R-to-L + fade brings it left.",
+          "Power down — tailwind maximizes carry."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind maximizes distance; R-to-L drifts left. Overstable prevents the drift from becoming a hard left turnover.",
+        "aim_point": "Right of landing zone",
+        "tips": [
+          "Excellent distance conditions.",
+          "Aim right — R-to-L drifts it left.",
+          "Overstable prevents drift from getting out of control."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind carries far; R-to-L drifts left. Overstable fights both and lands the disc at the basket.",
+        "aim_point": "Right of center, low chains",
+        "tips": [
+          "Power down — tailwind adds momentum.",
+          "Aim right — R-to-L drifts left."
+        ]
+      }
+    },
+    "uphill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + uphill both reduce stability (right effect). R-to-L pushes left. Three partially canceling forces. Overstable keeps flight straight.",
+        "aim_point": "Slightly right of target",
+        "tips": [
+          "Tailwind + uphill push right; R-to-L pushes left.",
+          "Overstable keeps the disc straight.",
+          "Power up for uphill."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "mid",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L + disc fade push left; tailwind + uphill resist. Overstable mid + R-to-L = reliable left finish.",
+        "aim_point": "Right of target",
+        "tips": [
+          "R-to-L helps the left finish despite tailwind + uphill.",
+          "Power up for uphill."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + uphill push right; R-to-L fights it. Stable disc on flat rides the tailwind + uphill forces for a mild right finish.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Tailwind and uphill help the right finish.",
+          "R-to-L partially fights you — aim farther left than normal."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L + disc fade push left; tailwind helps distance. Stable driver maximizes left carry with tailwind help.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Tailwind + R-to-L = good left carry distance.",
+          "Power up for uphill but let tailwind help."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + uphill both reduce stability (push right); R-to-L fights. Understable disc rides tailwind + uphill for a right flight, R-to-L keeps it from going too far right.",
+        "aim_point": "Left of target",
+        "tips": [
+          "Tailwind + uphill help the right; R-to-L moderates it.",
+          "Power up for uphill."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + uphill create right turn first (S start). R-to-L + disc fade brings it left at end.",
+        "aim_point": "Right of target",
+        "tips": [
+          "S-curve is natural in these conditions.",
+          "Power up for uphill."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind helps uphill distance; R-to-L drifts left. Stable driver maximizes distance without over-turning.",
+        "aim_point": "Right of landing zone",
+        "tips": [
+          "Tailwind partially compensates for uphill distance loss.",
+          "Aim right — R-to-L drifts left."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind helps uphill putt; R-to-L drifts left. Stable putter with aim compensation handles both.",
+        "aim_point": "High right chains",
+        "tips": [
+          "Tailwind helps the uphill — don't over-power.",
+          "Aim high (uphill) and right (R-to-L drift)."
+        ]
+      }
+    },
+    "downhill": {
+      "straight": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + downhill both add massive distance; R-to-L drifts left. Overstable keeps disc on a straight forward line.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Power way down — massive distance potential.",
+          "Aim right — R-to-L drifts left.",
+          "Overstable prevents tailwind from flipping the disc."
+        ]
+      },
+      "short_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L pushes left; tailwind + downhill extend distance. Stable driver rides R-to-L + disc fade for a long left finish.",
+        "aim_point": "Far right of target",
+        "tips": [
+          "Power way down — this carries very far.",
+          "Great left shot conditions with distance."
+        ]
+      },
+      "short_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L fights right; tailwind + downhill carry far. Overstable resists R-to-L for a mild right finish over a long flight.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Power way down — don't fight these conditions for a short-right shot.",
+          "Use a mid disc for better control on shorter shots."
+        ]
+      },
+      "long_left": {
+        "disc": {
+          "category": "driver",
+          "stability": "understable"
+        },
+        "angle": "flat",
+        "disc_explanation": "R-to-L pushes left; tailwind + downhill carry far. Understable counteracts the downhill's overstability effect for a smooth long-left flight.",
+        "aim_point": "Right of target",
+        "tips": [
+          "Tremendous left carry with tailwind + downhill.",
+          "Power way down."
+        ]
+      },
+      "long_right": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "anhyzer",
+        "disc_explanation": "R-to-L fights right; tailwind + downhill carry. Overstable + anhyzer fights R-to-L while tailwind + downhill carry it far right.",
+        "aim_point": "Far left of target",
+        "tips": [
+          "Tailwind + downhill help the carry for a long right finish.",
+          "Power way down."
+        ]
+      },
+      "s_curve": {
+        "disc": {
+          "category": "driver",
+          "stability": "stable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind makes disc act understable (right first), downhill extends. R-to-L + disc fade brings it left. Long S-curve with lots of distance.",
+        "aim_point": "Right of target",
+        "tips": [
+          "S-curve is natural — tailwind turns right, R-to-L + fade brings left.",
+          "Massive distance — power way down."
+        ]
+      },
+      "distance": {
+        "disc": {
+          "category": "driver",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + downhill = absolute maximum distance. R-to-L drifts left. Overstable prevents a turnover on the monster carry.",
+        "aim_point": "Right of landing zone",
+        "tips": [
+          "Best distance conditions overall.",
+          "Power way down — let the conditions do the work.",
+          "Overstable is critical — this combo can flip any understable disc."
+        ]
+      },
+      "putting": {
+        "disc": {
+          "category": "putter",
+          "stability": "overstable"
+        },
+        "angle": "flat",
+        "disc_explanation": "Tailwind + downhill carry far; R-to-L drifts left. Overstable fights both leftward forces.",
+        "aim_point": "Right of center, very low chains",
+        "tips": [
+          "Power way down — this putt will fly.",
+          "Aim right and very low."
+        ]
+      }
+    }
+  }
+};
 
-    const key = `${newDisc}|${newAngle}`;
-    if (seen.has(key)) return null;
-    seen.add(key);
-    return {
-      ...r,
-      disc:    newDisc,
-      angle:   newAngle,
-      summary: summaryPrefix + r.summary,
-      tip:     tipNote + ' ' + r.tip,
-    };
-  }).filter(Boolean);
-}
-
-// ─── Shot Shapes ─────────────────────────────────────────────────────────────
-
-export const SHOT_SHAPES = [
-  { id: "straight",     label: "Straight",        icon: "➡️",  desc: "Flies as directly at target as possible" },
-  { id: "long_left",    label: "Long Left Curve",  icon: "↩️",  desc: "Big sweeping arc finishing left" },
-  { id: "short_left",   label: "Short Left Fade",  icon: "↖️",  desc: "Tight left fade at end, not much distance" },
-  { id: "long_right",   label: "Long Right Curve", icon: "↪️",  desc: "Big sweeping arc finishing right" },
-  { id: "short_right",  label: "Short Right Turn", icon: "↗️",  desc: "Tight right curve, not much distance" },
-  { id: "s_curve",      label: "S-Curve",          icon: "〰️",  desc: "Goes one way then curves back the other" },
-  { id: "max_distance", label: "Max Distance",     icon: "🚀",  desc: "Get it as far as possible" },
-  { id: "putting",      label: "Putting",          icon: "🏹",  desc: "Short controlled throw into the basket" },
+const WIND_CONFIG = [
+  {
+    id: "no_wind",
+    sourceKey: "no_wind",
+    label: "No Wind",
+    icon: "○",
+    desc: "Calm conditions"
+  },
+  {
+    id: "headwind",
+    sourceKey: "headwind",
+    label: "Headwind",
+    icon: "↓",
+    desc: "Wind coming straight at you"
+  },
+  {
+    id: "tailwind",
+    sourceKey: "tailwind",
+    label: "Tailwind",
+    icon: "↑",
+    desc: "Wind pushing from behind"
+  },
+  {
+    id: "right_to_left",
+    sourceKey: "right_to_left",
+    label: "R→L Cross",
+    icon: "←",
+    desc: "Wind blowing right to left"
+  },
+  {
+    id: "left_to_right",
+    sourceKey: "left_to_right",
+    label: "L→R Cross",
+    icon: "→",
+    desc: "Wind blowing left to right"
+  },
+  {
+    id: "headwind_right_to_left",
+    sourceKey: "headwind_right_to_left",
+    label: "Head + R→L",
+    icon: "↙",
+    desc: "Headwind with right-to-left component"
+  },
+  {
+    id: "headwind_left_to_right",
+    sourceKey: "headwind_left_to_right",
+    label: "Head + L→R",
+    icon: "↘",
+    desc: "Headwind with left-to-right component"
+  },
+  {
+    id: "tailwind_right_to_left",
+    sourceKey: "tailwind_right_to_left",
+    label: "Tail + R→L",
+    icon: "↖",
+    desc: "Tailwind with right-to-left component"
+  },
+  {
+    id: "tailwind_left_to_right",
+    sourceKey: "tailwind_left_to_right",
+    label: "Tail + L→R",
+    icon: "↗",
+    desc: "Tailwind with left-to-right component"
+  }
 ];
 
-// ─── Reference Data ───────────────────────────────────────────────────────────
-// Keyed by disc stability → throw angle → wind direction
+const TERRAIN_CONFIG = [
+  {
+    id: "uphill",
+    sourceKey: "uphill",
+    label: "Uphill",
+    icon: "⬆️",
+    desc: "Throwing up a slope"
+  },
+  {
+    id: "flat",
+    sourceKey: "flat",
+    label: "Flat",
+    icon: "➡️",
+    desc: "Level ground, no elevation change"
+  },
+  {
+    id: "downhill",
+    sourceKey: "downhill",
+    label: "Downhill",
+    icon: "⬇️",
+    desc: "Throwing down a slope"
+  }
+];
 
-export const refData = {
-  understable: {
-    hyzer: {
-      headwind: { behavior: "Will flip to flat or anhyzer faster than expected. May turn hard right.", tip: "Throw with more hyzer than usual. Headwinds exaggerate turn — compensate by adding extra hyzer angle." },
-      tailwind: { behavior: "Already hyzer + understable wants to turn — tailwind reduces lift, disc may stall and fade early.", tip: "Release flatter. Tailwinds reduce disc speed effect, so the flip may not happen as expected." },
-      r2l:      { behavior: "Wind pushing disc left; understable wants to go right — these can cancel out or create unpredictable S-curve.", tip: "Aim right of target. Disc will likely still turn right but wind will push it back left — watch for S-curve finish." },
-      l2r:      { behavior: "Wind and disc both pushing right — disc goes hard right, may over-turn.", tip: "Aim well left of target. Strong L→R will make understable discs dive right aggressively." },
-      head_r2l: { behavior: "Headwind flips disc fast, R→L wind catches the turned disc and pushes left. Chaotic.", tip: "Not ideal. Use a more stable disc. If you must, add significant extra hyzer and aim right." },
-      head_l2r: { behavior: "Headwind causes flip, L→R compounds right turn. Disc likely over-turns severely.", tip: "Avoid this combo with understable discs. Go stable or overstable instead." },
-      tail_r2l: { behavior: "Disc stalls, turn is suppressed, R→L pushes left. May fade left early.", tip: "Aim right and release with more power than usual to maintain disc speed through the turn." },
-      tail_l2r: { behavior: "Turn is suppressed by tailwind, L→R pushes right. Disc may not turn as expected.", tip: "Aim left. The turn will be reduced but L→R will add rightward drift throughout." },
-    },
-    flat: {
-      headwind: { behavior: "Headwind causes understable disc to flip and turn right hard. Classic over-turn.", tip: "Add hyzer to compensate. Understable + headwind = predictable hard right turn. Use this intentionally for right turnover shots." },
-      tailwind: { behavior: "Less lift means the disc acts more stable. Turn phase is reduced.", tip: "Can throw a bit harder. Disc will behave closer to stable — good for straighter shots." },
-      r2l:      { behavior: "Disc wants to go right (turn), wind pushes left — S-curve likely. Ends close to straight.", tip: "Good combo for a straight finish. Aim slightly right, let the turn and wind offset each other." },
-      l2r:      { behavior: "Turn + L→R wind = disc goes right hard. Strong rightward movement.", tip: "Aim far left. This is a big right-curving shot. Useful for right-curving lines around obstacles." },
-      head_r2l: { behavior: "Headwind causes flip, R→L softens rightward drift. May fly surprisingly straight.", tip: "Use this to throw a straighter line with an understable disc. Aim slightly right." },
-      head_l2r: { behavior: "Headwind flips it, L→R adds to right movement. Very hard right.", tip: "Avoid or use only for intentional hard right turnover lines." },
-      tail_r2l: { behavior: "Turn reduced, R→L pushes left. Disc likely finishes left of target.", tip: "Aim right. Power up to maintain turn, or switch to more stable disc." },
-      tail_l2r: { behavior: "Turn reduced by tailwind, L→R adds right drift. Relatively predictable rightward line.", tip: "Aim left of target. Good for straight-to-right lines when throwing with the wind." },
-    },
-    anhyzer: {
-      headwind: { behavior: "Very aggressive right turn and potential dive. Disc may ground out.", tip: "High risk. Only use intentionally for max right turnover. Consider more stable disc." },
-      tailwind: { behavior: "Anhyzer line holds longer than expected. Slower to fade.", tip: "Good for long sweeping right-curving shots. The tailwind gives it time to glide on the anhyzer angle." },
-      r2l:      { behavior: "Disc turning right, wind pushing left — creates a long sweeping S-curve.", tip: "Useful for threading a gap. Aim right, let it sweep left at end." },
-      l2r:      { behavior: "Already turning right, L→R compounds it. Disc dives right fast.", tip: "Very risky. Don't use understable anhyzer into L→R wind unless intentionally ground-balling." },
-      head_r2l: { behavior: "Flip goes right, wind pushes back — disc may actually fly straight-ish before fading.", tip: "Interesting control shot. Aim right, wind will pull it back. Experiment with release angle." },
-      head_l2r: { behavior: "Extreme right turn. Almost guaranteed over-turn and ground.", tip: "Avoid. Use overstable disc in this condition." },
-      tail_r2l: { behavior: "Anhyzer line held long, wind slowly corrects leftward. Long sweeping right-then-straight.", tip: "Nice control shot for big right-to-straight lines. Power up slightly." },
-      tail_l2r: { behavior: "Right turn amplified by wind. Long right-curving line.", tip: "Useful for big right curves with the wind. Aim well left." },
-    },
+const SHOT_CONFIG = [
+  {
+    id: "straight",
+    sourceKey: "straight",
+    label: "Straight",
+    icon: "➡️",
+    desc: "Flies as directly at target as possible"
   },
-  stable: {
-    hyzer: {
-      headwind: { behavior: "Disc holds hyzer longer, fades harder at end. Very reliable left-fading line.", tip: "Aim right of target. Headwind + hyzer = strong reliable fade. Great for precise left-curving approach shots." },
-      tailwind: { behavior: "Hyzer releases a bit earlier (disc flips up faster). May finish flatter than expected.", tip: "Add more hyzer angle to maintain intended line. Tailwind acts like making disc slightly understable." },
-      r2l:      { behavior: "Hyzer line goes left, wind pushes left too. Strong left drift.", tip: "Aim significantly right. Both the disc flight and wind are pushing left." },
-      l2r:      { behavior: "Hyzer wants to go left, wind pushes right — offsets into a straighter-than-normal line.", tip: "Good combo for a straight but left-launched line. Aim just left of target." },
-      head_r2l: { behavior: "Headwind holds hyzer, R→L adds left push. Hard predictable left.", tip: "Aim well right. Reliable hard left-fading line. Great for tight left doglegs." },
-      head_l2r: { behavior: "Headwind holds hyzer, L→R partially offsets — disc flies straighter than expected.", tip: "Useful for a controlled headwind shot. The L→R counteracts the fade — aim at target." },
-      tail_r2l: { behavior: "Hyzer flips up faster, R→L pushes left. May end up near target if you aim slightly right.", tip: "Aim slightly right. Tailwind flips it up, R→L brings it back. Can be a nice straight-ish line." },
-      tail_l2r: { behavior: "Hyzer flips early, L→R pushes right. Disc may end up far right.", tip: "Aim left. Or use a more overstable disc to hold the hyzer angle in the tailwind." },
-    },
-    flat: {
-      headwind: { behavior: "Headwind makes disc act overstable. Fades harder and earlier than calm air.", tip: "Aim right of target, release flat or with slight hyzer. This is the most reliable headwind shot." },
-      tailwind: { behavior: "Disc acts slightly understable. Longer flight, may not fade as expected.", tip: "Classic tailwind shot — great distance. Disc flies flatter and longer. Good for open fairways." },
-      r2l:      { behavior: "Disc fades left at end, wind pushes left. Finishes left of aim point.", tip: "Aim right. A stable disc in R→L wind drifts left throughout. Reliable for left-finishing shots." },
-      l2r:      { behavior: "Disc's natural fade fights L→R wind. Flight is straighter than in calm air.", tip: "Great for straight shots. The L→R wind counteracts the natural left fade. Aim at target." },
-      head_r2l: { behavior: "Headwind causes early fade, R→L compounds leftward finish.", tip: "Aim well right. Power up to fight both forces. Use for left-curving headwind lines." },
-      head_l2r: { behavior: "Headwind causes early overstable behavior, L→R partially counteracts fade. Straighter than expected.", tip: "Good reliable headwind line. Aim slightly right and throw with confidence." },
-      tail_r2l: { behavior: "Disc flies longer (tailwind), R→L adds left drift. Finishes left of normal.", tip: "Aim right. Good for long left-finishing shots with the wind. Use for wide left-curving lines." },
-      tail_l2r: { behavior: "Long flight, L→R keeps it from fading left. Very straight long shot possible.", tip: "Best distance shot combo. Aim straight at target. This is your big-distance line." },
-    },
-    anhyzer: {
-      headwind: { behavior: "Headwind fights the anhyzer — disc comes back to flat or even fades left. Shorter flight.", tip: "Not ideal. Headwind kills anhyzer lines on stable discs. Use understable disc instead." },
-      tailwind: { behavior: "Anhyzer line holds beautifully. Long sweeping right-curving shot.", tip: "Great combo. The tailwind sustains the anhyzer angle. Perfect for long sweeping right-curving lines." },
-      r2l:      { behavior: "Disc wants to go right (anhyzer), wind pushes left — creates mild S-curve or near-straight.", tip: "Good for straight shots thrown on anhyzer. Aim right, let wind bring it back." },
-      l2r:      { behavior: "Anhyzer + L→R = strong rightward line that holds throughout.", tip: "Aim well left. This will go right decisively. Good for big right-curving lines." },
-      head_r2l: { behavior: "Headwind kills anhyzer angle. Disc goes straighter or even fades left.", tip: "Disc won't hold anhyzer in headwind. Switch to understable disc for right-curving headwind shots." },
-      head_l2r: { behavior: "Headwind partially kills right curve, L→R maintains some. Moderate right curve.", tip: "Can work. Use understable disc for more reliable right curve into headwind." },
-      tail_r2l: { behavior: "Anhyzer line held long by tailwind, R→L brings it back to center. Predictable S-curve.", tip: "Nice controlled shot. Aim right of gap, let the S-curve thread it." },
-      tail_l2r: { behavior: "Tailwind holds anhyzer, L→R adds to right movement. Very strong right curve.", tip: "Aim well left. This is a big powerful right-curving line. Great for right doglegs with tailwind." },
-    },
+  {
+    id: "long_left",
+    sourceKey: "long_left",
+    label: "Long Left Curve",
+    icon: "↩️",
+    desc: "Big sweeping arc finishing left"
   },
-  overstable: {
-    hyzer: {
-      headwind: { behavior: "Disc fades hard and fast. Very short flight, hooks left quickly.", tip: "Use for tight left-curving shots only. Don't expect distance. This is a utility shot." },
-      tailwind: { behavior: "Overstable fights tailwind well. Still fades left but flies a bit farther than into headwind.", tip: "Tailwind helps overstable discs go farther. Still reliable left fade. Good control shot." },
-      r2l:      { behavior: "Fade goes left, wind pushes left. Hard left — disc finishes well left.", tip: "Aim well right. Reliable but extreme left finish. Good for sharp left doglegs." },
-      l2r:      { behavior: "Fade left, wind pushes right — neutralizes some, disc finishes near or slightly left.", tip: "Good control shot. The L→R softens the hard fade. Aim slightly right of target." },
-      head_r2l: { behavior: "Headwind + R→L + overstable hyzer = extreme left. Very short very left.", tip: "Only for tight left-curving shots in a tunnel. Expect short distance." },
-      head_l2r: { behavior: "Headwind holds hyzer, L→R counteracts some fade. More controllable left curve.", tip: "Solid utility shot. Aim right, disc will curve reliably left without going extreme." },
-      tail_r2l: { behavior: "Tailwind helps it fly, R→L + fade = finishes left. Moderate left curve.", tip: "Good controlled left-curving tailwind shot. Aim right and let the disc work." },
-      tail_l2r: { behavior: "Tailwind extends flight, L→R softens fade. Disc flies longer and finishes near target.", tip: "Nice distance control shot. Aim slightly right. Good for long left-curving shots." },
-    },
-    flat: {
-      headwind: { behavior: "Overstable disc resists headwind well. Fades predictably left. This is the ideal headwind disc.", tip: "The go-to headwind disc. Throw flat with confidence. Aim right, let it fade back. Very reliable." },
-      tailwind: { behavior: "Tailwind makes overstable act more stable. Longer flight before fade.", tip: "Good distance shot. Still fades left at end but gives you more distance than calm air." },
-      r2l:      { behavior: "Fade left + wind left = strong left-finishing shot. Predictable.", tip: "Aim right. Very reliable left-finishing shot. Good for consistent left-curving lines." },
-      l2r:      { behavior: "Fade wants to go left, L→R pushes right — disc flies surprisingly straight.", tip: "Great straight-line shot in crosswind. The two forces cancel. Aim at target and throw." },
-      head_r2l: { behavior: "Wind fights it from both sides — disc still fades left predictably, just shorter flight.", tip: "Reliable but short. Use for accuracy, not distance. Aim right of target." },
-      head_l2r: { behavior: "Headwind makes it fade early, L→R slows the drift. Finishes just left of aim.", tip: "Very reliable headwind shot. Aim slightly right of target. This is your money shot in headwinds." },
-      tail_r2l: { behavior: "Good distance, disc fades left, R→L adds more leftward push at end.", tip: "Aim right. Nice long left-curving tailwind shot." },
-      tail_l2r: { behavior: "Best distance for overstable disc. Fade partly cancelled by L→R. Long and relatively straight.", tip: "Maximum distance shot for overstable. Aim at target or slightly left. This is the big distance line." },
-    },
-    anhyzer: {
-      headwind: { behavior: "Headwind flattens out the anhyzer angle immediately. Disc comes back to flat and fades left.", tip: "Don't bother. Overstable anhyzer into headwind just becomes a flat fade. Use stable or understable disc instead." },
-      tailwind: { behavior: "Anhyzer fights the overstable nature — disc may fly relatively straight before mild left fade.", tip: "Usable for near-straight or gentle right-leaning shot. But use stable disc for better results." },
-      r2l:      { behavior: "Disc fights to fade left, R→L pushes left — both forces aligned left, but anhyzer angle delays it.", tip: "Will eventually go left. Aim right. Not the best use of overstable anhyzer." },
-      l2r:      { behavior: "Anhyzer wants to go right, overstable wants to fade left, L→R pushes right — slight right curve before late left fade.", tip: "Can produce a mild S-curve. Useful for threading specific gaps." },
-      head_r2l: { behavior: "Headwind kills anhyzer, R→L pushes left. Disc goes left despite the release angle.", tip: "Don't use. Conditions fight the release angle completely." },
-      head_l2r: { behavior: "Headwind and L→R both counteract overstable fade. Disc may actually fly straighter than expected.", tip: "Interesting shot. Can produce a relatively straight flight. Test this in practice before relying on it." },
-      tail_r2l: { behavior: "Anhyzer partially maintained by tailwind. R→L pushes back left eventually. Mild S-curve.", tip: "Can work for S-curve lines. Aim right, expect it to swing back left at end." },
-      tail_l2r: { behavior: "Tailwind sustains anhyzer, L→R adds right push. Disc holds right curve before late fade.", tip: "Best overstable anhyzer combo. Moderate right-curving line. Aim left, expect gentle right-to-fade finish." },
-    },
+  {
+    id: "short_left",
+    sourceKey: "short_left",
+    label: "Short Left Fade",
+    icon: "↖️",
+    desc: "Tight left fade at end, not much distance"
   },
-};
+  {
+    id: "long_right",
+    sourceKey: "long_right",
+    label: "Long Right Curve",
+    icon: "↪️",
+    desc: "Big sweeping arc finishing right"
+  },
+  {
+    id: "short_right",
+    sourceKey: "short_right",
+    label: "Short Right Turn",
+    icon: "↗️",
+    desc: "Tight right curve, not much distance"
+  },
+  {
+    id: "s_curve",
+    sourceKey: "s_curve",
+    label: "S-Curve",
+    icon: "〰️",
+    desc: "Goes one way then curves back the other"
+  },
+  {
+    id: "distance",
+    sourceKey: "distance",
+    label: "Distance",
+    icon: "🚀",
+    desc: "Get it as far as possible"
+  },
+  {
+    id: "putting",
+    sourceKey: "putting",
+    label: "Putting",
+    icon: "🏹",
+    desc: "Short controlled throw into the basket"
+  }
+];
 
-// ─── Disc Suggester Data ──────────────────────────────────────────────────────
-// Keyed by shot shape → wind direction → array of recommendations (best first)
+const WIND_ID_TO_SOURCE = Object.fromEntries(
+  WIND_CONFIG.map((entry) => [entry.id, entry.sourceKey])
+);
 
-export const suggestions = {
-  straight: {
-    headwind:  [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "Overstable discs resist headwind best and still fade predictably.", tip: "Aim right of target — the wind-amplified fade will bring it back.", aimNote: "Aim right" },
-      { disc: "stable",     angle: "flat",   confidence: "good", summary: "Stable flat is reliable in a headwind if you don't overthrow it.", tip: "Throw at 70–80% power. Headwind + full power = early fade.", aimNote: "Aim slightly right" },
-    ],
-    tailwind:  [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Tailwind makes stable discs fly longer and straighter — ideal.", tip: "This is your max-range straight shot. Trust the disc and let it fly.", aimNote: "Aim at target" },
-      { disc: "overstable", angle: "flat",   confidence: "good", summary: "Overstable with tailwind acts like a stable disc — straighter than normal.", tip: "Good option if you want a reliable fade at the end of a long straight flight.", aimNote: "Aim slightly left" },
-    ],
-    r2l:      [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Stable disc fades left, R→L wind pushes left — but a flat release through the middle works if you lead the wind.", tip: "Aim right of target. The drift and fade will combine to bring it back toward center.", aimNote: "Aim right" },
-      { disc: "overstable", angle: "flat",   confidence: "good", summary: "Overstable fades left, R→L pushes left — strong left forces, so aim further right.", tip: "Lead the wind significantly. Not as straight as calm air but reliable.", aimNote: "Aim well right" },
-      { disc: "understable",angle: "flat",   confidence: "good", summary: "Understable turns right while R→L pushes left — forces cancel for a surprisingly straight flight.", tip: "Aim slightly right. This S-curve trick can produce a very straight result.", aimNote: "Aim slightly right" },
-    ],
-    l2r:      [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "Overstable fade fights the L→R push — two opposing forces = straight line.", tip: "Aim at target. The disc's natural fade and the crosswind cancel each other out perfectly.", aimNote: "Aim at target" },
-      { disc: "stable",     angle: "flat",   confidence: "good", summary: "Stable flat also benefits from L→R cancelling the fade.", tip: "Aim slightly left of target. Works best in moderate crosswind.", aimNote: "Aim slightly left" },
-    ],
-    head_r2l: [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "Overstable resists both headwind and R→L drift. Most reliable straight line in tough conditions.", tip: "Aim right. You're fighting headwind fade AND rightward compensation. Power through it.", aimNote: "Aim right" },
-      { disc: "stable",     angle: "hyzer",  confidence: "good", summary: "Stable hyzer with headwind — fade and R→L push cancel into something workable.", tip: "Aim well right. This requires precise execution.", aimNote: "Aim well right" },
-    ],
-    head_l2r: [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Headwind + L→R: the two forces partially cancel — stable flat is surprisingly straight.", tip: "Aim slightly right. Headwind fades it, L→R keeps it from going too far left.", aimNote: "Aim slightly right" },
-      { disc: "overstable", angle: "flat",   confidence: "good", summary: "Overstable headwind with L→R softening the fade. Very controllable.", tip: "Reliable money shot in this wind. Aim right of target.", aimNote: "Aim right" },
-    ],
-    tail_r2l: [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Tailwind helps it fly farther, R→L drift is manageable by aiming right.", tip: "Aim right of target and let the wind do the work. Great distance shot.", aimNote: "Aim right" },
-      { disc: "understable",angle: "flat",   confidence: "good", summary: "Understable turn + R→L wind cancel into a straight-ish line.", tip: "Aim slightly right. Power up slightly to ensure the disc gets through its turn phase.", aimNote: "Aim slightly right" },
-    ],
-    tail_l2r: [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Best straight-line shot in any condition. Tailwind + L→R both reduce fading. Very long and straight.", tip: "This is the ideal setup for a dead-straight distance shot. Aim at target and rip it.", aimNote: "Aim at target" },
-      { disc: "overstable", angle: "flat",   confidence: "good", summary: "Overstable fade + L→R push cancel. Long and straighter than calm air.", tip: "Aim at or slightly left of target.", aimNote: "Aim at target" },
-    ],
-  },
-  long_left: {
-    headwind:  [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "Headwind amplifies overstable fade hard left — ideal for a big left-curving shot.", tip: "Aim right, throw at 80% power. Don't muscle it or it fades too early.", aimNote: "Aim right" },
-      { disc: "stable",     angle: "hyzer",  confidence: "good", summary: "Stable hyzer into headwind holds the angle and sweeps left reliably.", tip: "Aim right of target. A confident stroke, not a punch.", aimNote: "Aim right" },
-    ],
-    tailwind:  [
-      { disc: "stable",     angle: "hyzer",  confidence: "best", summary: "Tailwind gives distance, hyzer gives the left-curving shape. Long sweeping left arc.", tip: "Aim right, add extra hyzer to compensate for the tailwind flip.", aimNote: "Aim right" },
-      { disc: "overstable", angle: "flat",   confidence: "good", summary: "Overstable with tailwind acts stable — still fades left but gives you more distance.", tip: "Reliable long left fade with the wind behind you.", aimNote: "Aim right" },
-    ],
-    r2l:      [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "Overstable fade + R→L wind = dominant left movement throughout the flight.", tip: "Aim significantly right. This combo curves left hard all the way.", aimNote: "Aim well right" },
-      { disc: "stable",     angle: "flat",   confidence: "good", summary: "Stable flat fades left, R→L compounds it. Reliable left-finishing line.", tip: "Aim right of target. Both forces push left.", aimNote: "Aim right" },
-    ],
-    l2r:      [
-      { disc: "overstable", angle: "hyzer",  confidence: "best", summary: "Hyzer holds the angle against the L→R push. Still fades left but you need extra angle.", tip: "Throw with aggressive hyzer. L→R is fighting the fade — you need to commit to the angle.", aimNote: "Aim slightly right" },
-      { disc: "stable",     angle: "hyzer",  confidence: "good", summary: "Stable hyzer partially fights the L→R. Will finish slightly left.", tip: "Workable but tricky. Aim right of target.", aimNote: "Aim right" },
-    ],
-    head_r2l: [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "Both headwind and R→L push leftward. Overstable ensures the fade happens. Reliable hard left.", tip: "Power up slightly to fight the headwind. Aim well right.", aimNote: "Aim well right" },
-    ],
-    head_l2r: [
-      { disc: "overstable", angle: "hyzer",  confidence: "best", summary: "Headwind locks in the hyzer, overstable ensures the fade. L→R slightly softens it.", tip: "Aim right. The L→R will temper the left curve slightly but you'll still get a reliable left arc.", aimNote: "Aim right" },
-    ],
-    tail_r2l: [
-      { disc: "stable",     angle: "hyzer",  confidence: "best", summary: "Tailwind adds distance, hyzer + R→L give the left-curving shape.", tip: "Great long left shot. Aim right and let the wind do the work.", aimNote: "Aim right" },
-      { disc: "overstable", angle: "flat",   confidence: "good", summary: "Overstable still fades left with tailwind, R→L amplifies the finish left.", tip: "Aim right. Powerful left-curving tailwind shot.", aimNote: "Aim right" },
-    ],
-    tail_l2r: [
-      { disc: "overstable", angle: "hyzer",  confidence: "best", summary: "Overstable hyzer fights the L→R and tailwind flip — holds the left-curving line.", tip: "Use aggressive hyzer. This is a controlled power shot.", aimNote: "Aim right" },
-    ],
-  },
-  short_left: {
-    headwind:  [
-      { disc: "overstable", angle: "hyzer",  confidence: "best", summary: "Fades hard and fast left. Very short left-finishing shot.", tip: "Throw at 50–60% power. You want it to die left quickly.", aimNote: "Aim right" },
-    ],
-    tailwind:  [
-      { disc: "overstable", angle: "hyzer",  confidence: "best", summary: "Even tailwind can't stop an overstable hyzer from fading left — just slightly farther.", tip: "Throw softly. Tailwind will add distance so release gently to keep it short.", aimNote: "Aim right" },
-    ],
-    r2l:      [
-      { disc: "overstable", angle: "hyzer",  confidence: "best", summary: "Hyzer + R→L wind both pull left. Very tight left-finishing shot.", tip: "Throw softly. Both forces work together — don't overpower it or it drifts too far.", aimNote: "Aim right" },
-    ],
-    l2r:      [
-      { disc: "overstable", angle: "hyzer",  confidence: "best", summary: "L→R fights the fade but overstable hyzer still finishes left.", tip: "Use aggressive hyzer angle to overcome the L→R drift.", aimNote: "Aim right" },
-      { disc: "stable",     angle: "hyzer",  confidence: "good", summary: "Stable hyzer in L→R still fades left, just more controlled.", tip: "Aim slightly right of target. L→R softens the fade — a cleaner left curve.", aimNote: "Aim right" },
-    ],
-    head_r2l: [
-      { disc: "overstable", angle: "hyzer",  confidence: "best", summary: "Headwind + R→L + hyzer = maximum left force. Very tight and short left finish.", tip: "Only for a tight left dogleg or tucked basket. Throw at low power.", aimNote: "Aim well right" },
-    ],
-    head_l2r: [
-      { disc: "overstable", angle: "hyzer",  confidence: "best", summary: "Headwind locks in hyzer angle. L→R softens it slightly but still fades left.", tip: "Reliable tight left fade. Aim right of target.", aimNote: "Aim right" },
-    ],
-    tail_r2l: [
-      { disc: "overstable", angle: "hyzer",  confidence: "best", summary: "Throw softly — tailwind will carry it, hyzer + R→L pull it left.", tip: "Throw at low power. The conditions do the work.", aimNote: "Aim right" },
-    ],
-    tail_l2r: [
-      { disc: "overstable", angle: "hyzer",  confidence: "best", summary: "L→R fights the left fade but overstable hyzer still wins with enough angle.", tip: "Use aggressive hyzer. Throw with moderate power.", aimNote: "Aim right" },
-    ],
-  },
-  long_right: {
-    headwind:  [
-      { disc: "understable",angle: "flat",   confidence: "best", summary: "Headwind flips understable discs right hard — use this intentionally for a long right curve.", tip: "Add slight hyzer so it flips to flat and continues right. Don't throw on anhyzer into headwind.", aimNote: "Aim left" },
-      { disc: "stable",     angle: "anhyzer",confidence: "risky", summary: "Headwind kills anhyzer angles on stable discs — it will likely come back left.", tip: "Not reliable. Switch to understable if you need a right curve into headwind.", aimNote: "Aim left" },
-    ],
-    tailwind:  [
-      { disc: "understable",angle: "anhyzer",confidence: "best", summary: "Tailwind sustains the anhyzer angle. Long beautiful right-curving flight.", tip: "Aim left of target and let it sweep right. This is the ideal big right-curve shot.", aimNote: "Aim left" },
-      { disc: "stable",     angle: "anhyzer",confidence: "good", summary: "Stable anhyzer holds well in a tailwind. Long sweeping right curve.", tip: "Aim left. Tailwind gives you the distance, anhyzer gives the shape.", aimNote: "Aim left" },
-    ],
-    r2l:      [
-      { disc: "understable",angle: "anhyzer",confidence: "best", summary: "Turn right + R→L eventually corrects = long sweeping S-curve that finishes near center or right.", tip: "Aim right of desired finish. The S-curve lands this closer to straight.", aimNote: "Aim right of finish" },
-      { disc: "stable",     angle: "anhyzer",confidence: "good", summary: "Anhyzer goes right, R→L corrects it. A long right arc that comes back.", tip: "Good for threading a right-to-center line.", aimNote: "Aim right" },
-    ],
-    l2r:      [
-      { disc: "understable",angle: "anhyzer",confidence: "best", summary: "Turn right + L→R push right = very dominant right curve. Big right-arcing shot.", tip: "Aim well left. This will go right decisively and stay right.", aimNote: "Aim well left" },
-      { disc: "stable",     angle: "anhyzer",confidence: "good", summary: "Anhyzer + L→R wind holds the right curve all the way.", tip: "Aim left. L→R keeps the disc from fading back left.", aimNote: "Aim left" },
-    ],
-    head_r2l: [
-      { disc: "understable",angle: "hyzer",  confidence: "good", summary: "Headwind flips the understable to flat then right. R→L tempers the rightward drift — moderate right curve.", tip: "Add extra hyzer at release. The flip + headwind create the right curve.", aimNote: "Aim left" },
-    ],
-    head_l2r: [
-      { disc: "understable",angle: "flat",   confidence: "best", summary: "Headwind flips it right, L→R pushes right more. Dominant right-curving shot in headwind.", tip: "High risk of over-turn — throw at moderate power only.", aimNote: "Aim well left" },
-    ],
-    tail_r2l: [
-      { disc: "understable",angle: "anhyzer",confidence: "best", summary: "Tailwind holds anhyzer long, R→L corrects back. Long sweeping right-then-center line.", tip: "Aim right of your target. The S-curve finish will land it close to center.", aimNote: "Aim right of finish" },
-    ],
-    tail_l2r: [
-      { disc: "understable",angle: "anhyzer",confidence: "best", summary: "Tailwind holds the turn, L→R adds to it. Very long dominant right curve.", tip: "Aim well left. This is a big powerful right-arc shot. Great for right doglegs with wind.", aimNote: "Aim well left" },
-      { disc: "stable",     angle: "anhyzer",confidence: "good", summary: "Tailwind + L→R hold the stable anhyzer angle far. Long sweeping right shot.", tip: "Aim left. Great distance on this line.", aimNote: "Aim left" },
-    ],
-  },
-  short_right: {
-    headwind:  [
-      { disc: "understable",angle: "anhyzer",confidence: "best", summary: "Headwind + understable + anhyzer = fast aggressive right turn. Disc turns and stops right.", tip: "High risk — disc may over-turn and ground. Throw at low-medium power.", aimNote: "Aim left" },
-    ],
-    tailwind:  [
-      { disc: "understable",angle: "anhyzer",confidence: "best", summary: "Anhyzer holds in tailwind but finishes right. Controlled right-finishing shot.", tip: "Throw at medium power. The tailwind sustains the line.", aimNote: "Aim left" },
-    ],
-    r2l:      [
-      { disc: "understable",angle: "flat",   confidence: "good", summary: "Turn goes right, R→L corrects back. S-curve finishes near center — not great for short right.", tip: "Tricky in R→L. Use anhyzer release for more committed right finish.", aimNote: "Aim left" },
-      { disc: "understable",angle: "anhyzer",confidence: "good", summary: "Turn right, R→L pulls back eventually — use for a controlled right then center finish.", tip: "For a short right you may need to throw very softly so it dies right before R→L corrects.", aimNote: "Aim slightly left" },
-    ],
-    l2r:      [
-      { disc: "understable",angle: "anhyzer",confidence: "best", summary: "Turn right + L→R push = aggressive right finish. Very reliable short right.", tip: "Aim left. This will dive right — throw at low-medium power for a controlled short landing.", aimNote: "Aim left" },
-    ],
-    head_l2r: [
-      { disc: "understable",angle: "flat",   confidence: "best", summary: "Headwind flips to right, L→R compounds it. Aggressive short right shot.", tip: "Throw at lower power to prevent over-turning and grounding.", aimNote: "Aim left" },
-    ],
-    head_r2l: [
-      { disc: "understable",angle: "anhyzer",confidence: "risky", summary: "Turn goes right but R→L fights it — may not finish right reliably.", tip: "Risky. Consider a different approach or throw at very low power so it dies right before R→L takes over.", aimNote: "Aim left" },
-    ],
-    tail_l2r: [
-      { disc: "understable",angle: "anhyzer",confidence: "best", summary: "Tailwind + L→R + turn = sustained right curve. Throw softly for short right finish.", tip: "Throw at 50% power. The conditions will carry it right — you just need to start it.", aimNote: "Aim left" },
-    ],
-    tail_r2l: [
-      { disc: "understable",angle: "anhyzer",confidence: "good", summary: "Turn sustained by tailwind. R→L tempers it. Moderate right finish.", tip: "Throw softly and let it S-curve into position. Aim slightly left.", aimNote: "Aim slightly left" },
-    ],
-  },
-  s_curve: {
-    headwind:  [
-      { disc: "understable",angle: "hyzer",  confidence: "best", summary: "Headwind flips hyzer through flat to right, then R→L (if present) or disc dies left. Natural S-curve in headwind.", tip: "Start with hyzer, let headwind flip it right, then watch it fade back left at end.", aimNote: "Aim slightly right" },
-    ],
-    tailwind:  [
-      { disc: "understable",angle: "anhyzer",confidence: "best", summary: "Tailwind holds anhyzer (right) then as disc slows it fades left. Classic S-curve.", tip: "Aim right of gap, let it sweep right then fade left through the gap.", aimNote: "Aim right of gap" },
-    ],
-    r2l:      [
-      { disc: "understable",angle: "flat",   confidence: "best", summary: "Turn goes right, R→L pushes left. Two opposing forces = natural S-curve.", tip: "Aim slightly right of your target gap. Let the forces work.", aimNote: "Aim right of gap" },
-      { disc: "stable",     angle: "anhyzer",confidence: "good", summary: "Anhyzer goes right, disc naturally fades left at end. R→L assists the leftward correction.", tip: "Aim right of where you want to finish.", aimNote: "Aim right" },
-    ],
-    l2r:      [
-      { disc: "overstable", angle: "anhyzer",confidence: "good", summary: "Anhyzer goes right, overstable nature pulls it back left late. Mild S-curve.", tip: "Aim at or slightly left of your target gap.", aimNote: "Aim left of gap" },
-    ],
-    head_r2l: [
-      { disc: "understable",angle: "flat",   confidence: "best", summary: "Headwind flips disc right, R→L corrects leftward at end. Clean S-curve.", tip: "Aim right of the gap. Good for threading a narrow window.", aimNote: "Aim right of gap" },
-    ],
-    head_l2r: [
-      { disc: "understable",angle: "hyzer",  confidence: "good", summary: "Headwind flip goes right, L→R sustains rightward drift. Mild S before going right — less ideal.", tip: "Tricky. Best S-curves come from R→L crosswind conditions.", aimNote: "Aim left" },
-    ],
-    tail_r2l: [
-      { disc: "understable",angle: "anhyzer",confidence: "best", summary: "Tailwind holds anhyzer, R→L corrects back left at end. Long beautiful S-curve.", tip: "Aim right of your target. Great for long threading shots.", aimNote: "Aim right of target" },
-    ],
-    tail_l2r: [
-      { disc: "stable",     angle: "hyzer",  confidence: "good", summary: "Tailwind flips hyzer up (slight right), disc then fades left. L→R adds rightward drift first. Mild S-curve.", tip: "Can thread a gap with this. Aim right of gap, let the flip-then-fade work.", aimNote: "Aim right of gap" },
-    ],
-  },
-  max_distance: {
-    headwind:  [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "In headwind, overstable is the longest disc. It resists the wind and still flies far.", tip: "Throw at 80–90% power into a headwind. Don't max out — clean release beats raw power.", aimNote: "Aim right" },
-      { disc: "stable",     angle: "flat",   confidence: "good", summary: "Stable flat is a reliable second option into headwind.", tip: "Throw slightly softer than normal. Headwind + overpowering = early fade and lost distance.", aimNote: "Aim right" },
-    ],
-    tailwind:  [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Tailwind + stable flat = maximum possible distance. The wind adds carry and the disc flies flat.", tip: "This is the big one. Full power, clean release, aim at target. Trust it.", aimNote: "Aim at target" },
-      { disc: "understable",angle: "flat",   confidence: "good", summary: "Understable in tailwind acts like a stable disc — extra distance potential.", tip: "Don't overthrow it — tailwind makes understable disc less turny. Clean form beats power.", aimNote: "Aim at target" },
-    ],
-    r2l:      [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Stable flat in R→L — aim right and let the wind carry it. Good distance with natural correction.", tip: "Aim well right. The wind will carry it back toward center after the fade.", aimNote: "Aim right" },
-    ],
-    l2r:      [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "L→R kills the natural fade = longer, flatter flight. Best crosswind distance shot.", tip: "Aim at target or slightly left. The wind keeps it from fading and gives extra carry.", aimNote: "Aim at target" },
-      { disc: "overstable", angle: "flat",   confidence: "good", summary: "Overstable + L→R = surprising distance as fade is cancelled.", tip: "Aim at or slightly left of target.", aimNote: "Aim at target" },
-    ],
-    head_r2l: [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "Tough conditions. Overstable is the best tool. Aim right and power through it.", tip: "Don't expect distance records here. Prioritize control over power.", aimNote: "Aim right" },
-    ],
-    head_l2r: [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "Headwind + L→R = overstable flies straight and far. Best headwind distance option.", tip: "This is your go-to in this wind. Aim right, trust the disc.", aimNote: "Aim right" },
-    ],
-    tail_r2l: [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Tailwind distance with R→L drift — aim right and let the wind carry it far.", tip: "Big distance shot. Aim right, throw full power, let the wind work.", aimNote: "Aim right" },
-    ],
-    tail_l2r: [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Best possible distance condition. Tailwind + L→R = long straight flight with extra carry.", tip: "Maximum distance throw. Full power, aim at target. This is your record-distance setup.", aimNote: "Aim at target" },
-      { disc: "understable",angle: "flat",   confidence: "good", summary: "Understable in this wind acts very stable. Extra distance potential.", tip: "Clean form, full power. The two forces keep it flying straight and far.", aimNote: "Aim at target" },
-    ],
-  },
-  putting: {
-    headwind:  [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "Headwind pushes the disc down and left — overstable resists and tracks straight to the basket.", tip: "Aim slightly right of the basket. Throw with a firm flat release. Don't finesse it — commit.", aimNote: "Aim slightly right" },
-      { disc: "stable",     angle: "flat",   confidence: "good", summary: "Stable flat putt holds a reliable line into headwind if you don't under-throw.", tip: "Power up slightly vs. calm air. Headwind will slow the disc — it needs more juice to reach.", aimNote: "Aim at basket" },
-    ],
-    tailwind:  [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Tailwind carries the putt nicely but can push it past the basket if you don't account for the extra carry.", tip: "Throw softer than usual. Tailwind adds carry — dial back power to avoid sailing high.", aimNote: "Aim at basket" },
-      { disc: "understable",angle: "flat",   confidence: "good", summary: "Understable in tailwind acts more stable. Light easy release works well for a soft putt.", tip: "Soft and smooth. Let the tailwind do the work.", aimNote: "Aim at basket" },
-    ],
-    r2l:      [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "R→L drift pushes the disc left — overstable's rightward stability counteracts it for a truer line.", tip: "Aim right of the basket. Overstable fade and R→L push cancel toward center.", aimNote: "Aim right of basket" },
-      { disc: "stable",     angle: "flat",   confidence: "good", summary: "Stable flat putt drifts left in R→L wind — manageable with proper aim compensation.", tip: "Aim right of basket. More compensation needed in stronger wind.", aimNote: "Aim right of basket" },
-    ],
-    l2r:      [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "L→R wind pushes right, overstable's natural fade pushes left — they cancel for a straight putt.", tip: "Aim at the basket. These forces offset each other. Very reliable in moderate L→R wind.", aimNote: "Aim at basket" },
-      { disc: "stable",     angle: "flat",   confidence: "good", summary: "Stable flat putt drifts right in L→R — aim left to compensate.", tip: "Aim left of basket. The L→R will drift it back right.", aimNote: "Aim left of basket" },
-    ],
-    head_r2l: [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "Headwind slows it, R→L pushes left — overstable fights both. Best putt choice in these conditions.", tip: "Aim right of basket and power up. This wind combo is tough — commit to the putt.", aimNote: "Aim right of basket" },
-    ],
-    head_l2r: [
-      { disc: "overstable", angle: "flat",   confidence: "best", summary: "Headwind + L→R: headwind slows the disc, L→R partially cancels fade. Overstable tracks reliably.", tip: "Aim slightly right of basket. Throw with authority — headwind demands more power.", aimNote: "Aim slightly right" },
-    ],
-    tail_r2l: [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Tailwind adds carry, R→L pushes left. Aim right and throw softer than normal.", tip: "Aim right and back off your power. Let the wind carry it to the basket.", aimNote: "Aim right of basket" },
-    ],
-    tail_l2r: [
-      { disc: "stable",     angle: "flat",   confidence: "best", summary: "Tailwind + L→R: wind carries the disc forward and rightward. Soft putt, aim left.", tip: "Throw very softly. The conditions will carry it. Aim left of basket to account for drift.", aimNote: "Aim left of basket" },
-    ],
-  },
-};
+const TERRAIN_ID_TO_SOURCE = Object.fromEntries(
+  TERRAIN_CONFIG.map((entry) => [entry.id, entry.sourceKey])
+);
+
+const SHOT_ID_TO_SOURCE = Object.fromEntries(
+  SHOT_CONFIG.map((entry) => [entry.id, entry.sourceKey])
+);
+
+export const WIND_DIRECTIONS = WIND_CONFIG.map(({ id, label, icon, desc }) => ({
+  id,
+  label,
+  icon,
+  desc,
+}));
+
+export const TERRAIN_TYPES = TERRAIN_CONFIG.map(({ id, label, icon, desc }) => ({
+  id,
+  label,
+  icon,
+  desc,
+}));
+
+export const SHOT_SHAPES = SHOT_CONFIG.map(({ id, label, icon, desc }) => ({
+  id,
+  label,
+  icon,
+  desc,
+}));
+
+export const windGuideMeta = WIND_GUIDE_META;
+
+function normalizeRecommendation(shotId, entry) {
+  if (!entry || !entry.disc || !entry.disc.stability) {
+    return null;
+  }
+
+  const tips = Array.isArray(entry.tips) ? entry.tips : [];
+
+  return {
+    shotId,
+    disc: entry.disc.stability,
+    category: entry.disc.category,
+    angle: entry.angle,
+    summary: entry.disc_explanation,
+    aimNote: entry.aim_point,
+    tips,
+    tip: tips[0] || "",
+    confidence: "best",
+  };
+}
+
+/**
+ * Get a single recommendation for one wind + terrain + shot combination.
+ *
+ * @param {object} params Query parameters.
+ * @param {string} params.windId Selected wind id from WIND_DIRECTIONS.
+ * @param {string} params.terrainId Selected terrain id from TERRAIN_TYPES.
+ * @param {string} params.shotId Selected shot id from SHOT_SHAPES.
+ * @returns {object | null} Normalized recommendation or null if unavailable.
+ */
+export function getRecommendation({ windId, terrainId, shotId }) {
+  const windKey = WIND_ID_TO_SOURCE[windId];
+  const terrainKey = TERRAIN_ID_TO_SOURCE[terrainId];
+  const shotKey = SHOT_ID_TO_SOURCE[shotId];
+
+  if (!windKey || !terrainKey || !shotKey) {
+    return null;
+  }
+
+  const rawEntry = WIND_GUIDE_SOURCE[windKey]?.[terrainKey]?.[shotKey];
+  return normalizeRecommendation(shotId, rawEntry);
+}
+
+/**
+ * Build suggestions index in the shape: suggestions[shotId][windId][terrainId] => recommendation[]
+ *
+ * @returns {Record<string, Record<string, Record<string, object[]>>>} Suggestions lookup table.
+ */
+function buildSuggestions() {
+  const suggestionsIndex = {};
+
+  for (const shot of SHOT_SHAPES) {
+    suggestionsIndex[shot.id] = {};
+
+    for (const wind of WIND_DIRECTIONS) {
+      suggestionsIndex[shot.id][wind.id] = {};
+
+      for (const terrain of TERRAIN_TYPES) {
+        const recommendation = getRecommendation({
+          windId: wind.id,
+          terrainId: terrain.id,
+          shotId: shot.id,
+        });
+
+        suggestionsIndex[shot.id][wind.id][terrain.id] = recommendation ? [recommendation] : [];
+      }
+    }
+  }
+
+  return suggestionsIndex;
+}
+
+export const suggestions = buildSuggestions();
+
+/**
+ * Get all shot recommendations for one wind + terrain combination.
+ *
+ * @param {object} params Query parameters.
+ * @param {string} params.windId Selected wind id from WIND_DIRECTIONS.
+ * @param {string} params.terrainId Selected terrain id from TERRAIN_TYPES.
+ * @returns {object[]} Ordered list of shot recommendations.
+ */
+export function getRecommendationsForCondition({ windId, terrainId }) {
+  return SHOT_SHAPES.map((shot) => getRecommendation({ windId, terrainId, shotId: shot.id })).filter(Boolean);
+}

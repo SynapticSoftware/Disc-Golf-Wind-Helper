@@ -1,51 +1,32 @@
 import { useState } from 'react';
-import { WIND_DIRECTIONS, refData, discColors, angleLabels } from '@frisbee-wind/core';
+import { WIND_DIRECTIONS, TERRAIN_TYPES, SHOT_SHAPES, getRecommendationsForCondition, discColors } from '@frisbee-wind/core';
 
 export default function ReferenceTab() {
-  const [selectedDisc, setSelectedDisc]   = useState('stable');
-  const [selectedAngle, setSelectedAngle] = useState('flat');
-  const [selectedWind, setSelectedWind]   = useState('headwind');
+  const [selectedTerrain, setSelectedTerrain] = useState('flat');
+  const [selectedWind, setSelectedWind] = useState('no_wind');
 
-  const result = refData[selectedDisc][selectedAngle][selectedWind];
-  const colors = discColors[selectedDisc];
+  const shotLabelById = Object.fromEntries(SHOT_SHAPES.map((shot) => [shot.id, shot.label]));
+  const results = getRecommendationsForCondition({
+    windId: selectedWind,
+    terrainId: selectedTerrain,
+  });
 
   return (
     <div>
-      {/* Disc Stability */}
+      {/* Terrain */}
       <div className="mb-4">
-        <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">Disc Stability</div>
+        <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">Terrain</div>
         <div className="grid grid-cols-3 gap-2">
-          {['understable', 'stable', 'overstable'].map((disc) => {
-            const c = discColors[disc];
+          {TERRAIN_TYPES.map((terrain) => {
             return (
-              <button key={disc} onClick={() => setSelectedDisc(disc)}
+              <button key={terrain.id} onClick={() => setSelectedTerrain(terrain.id)}
+                aria-label={`Select terrain ${terrain.label}`}
                 className={`py-2 px-3 rounded border text-sm font-bold uppercase tracking-wide transition-all ${
-                  selectedDisc === disc
-                    ? `${c.bg} ${c.border} ${c.accent}`
+                  selectedTerrain === terrain.id
+                    ? 'bg-teal-900/40 border-teal-500 text-teal-300'
                     : 'bg-gray-900 border-gray-700 text-gray-500 hover:border-gray-500'
                 }`}>
-                {disc}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Throw Angle */}
-      <div className="mb-4">
-        <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">Throw Angle</div>
-        <div className="grid grid-cols-3 gap-2">
-          {['hyzer', 'flat', 'anhyzer'].map((angle) => {
-            const a = angleLabels[angle];
-            return (
-              <button key={angle} onClick={() => setSelectedAngle(angle)}
-                className={`py-2 px-3 rounded border text-sm transition-all ${
-                  selectedAngle === angle
-                    ? 'bg-gray-700 border-gray-400 text-white font-bold'
-                    : 'bg-gray-900 border-gray-700 text-gray-500 hover:border-gray-500'
-                }`}>
-                <div className="font-bold">{a.label}</div>
-                <div className="text-xs opacity-60 mt-0.5">{a.sub}</div>
+                {terrain.label}
               </button>
             );
           })}
@@ -58,6 +39,7 @@ export default function ReferenceTab() {
         <div className="grid grid-cols-4 gap-2">
           {WIND_DIRECTIONS.map((wind) => (
             <button key={wind.id} onClick={() => setSelectedWind(wind.id)}
+              aria-label={`Select wind ${wind.label}`}
               className={`py-3 px-2 rounded border text-center transition-all flex flex-col items-center justify-center gap-1 ${
                 selectedWind === wind.id
                   ? 'bg-yellow-900/40 border-yellow-500 text-yellow-300'
@@ -70,26 +52,46 @@ export default function ReferenceTab() {
         </div>
       </div>
 
-      {/* Result */}
-      {result && (
-        <div className={`rounded-lg border-2 p-5 ${colors.border} ${colors.bg}`}>
-          <div className="flex flex-wrap gap-2 mb-4">
-            <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${colors.badge}`}>{selectedDisc}</span>
-            <span className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300 font-bold uppercase">{selectedAngle}</span>
-            <span className="text-xs px-2 py-1 rounded bg-yellow-900/40 text-yellow-300 font-bold">
-              {WIND_DIRECTIONS.find(w => w.id === selectedWind)?.label}
-            </span>
-          </div>
-          <div className="mb-4">
-            <div className={`text-xs uppercase tracking-widest mb-1 ${colors.accent}`}>📡 Expected Behavior</div>
-            <p className="text-sm text-gray-200 leading-relaxed">{result.behavior}</p>
-          </div>
-          <div className="border-t border-gray-700 pt-4">
-            <div className={`text-xs uppercase tracking-widest mb-1 ${colors.accent}`}>💡 Throwing Tip</div>
-            <p className="text-sm text-gray-200 leading-relaxed">{result.tip}</p>
-          </div>
+      {/* Results */}
+      <div className="space-y-3">
+        <div className="text-xs text-gray-500 uppercase tracking-widest mb-3">
+          Reference for all shot shapes in this wind + terrain
         </div>
-      )}
+        {results.map((result) => {
+          const colors = discColors[result.disc] || discColors.stable;
+          return (
+            <div key={result.shotId} className={`rounded-lg border-2 p-5 ${colors.border} ${colors.bg}`}>
+              <div className="flex flex-wrap gap-2 mb-4">
+                <span className="text-xs px-2 py-1 rounded bg-white/10 text-white font-bold uppercase">{shotLabelById[result.shotId]}</span>
+                <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${colors.badge}`}>{result.disc}</span>
+                <span className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300 font-bold uppercase">{result.category}</span>
+                <span className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300 font-bold uppercase">{result.angle}</span>
+              </div>
+              <div className="mb-4">
+                <div className={`text-xs uppercase tracking-widest mb-1 ${colors.accent}`}>📡 Flight Explanation</div>
+                <p className="text-sm text-gray-200 leading-relaxed">{result.summary}</p>
+              </div>
+              <div className="mb-4">
+                <div className="text-xs text-gray-500 uppercase tracking-widest mb-1">Aim</div>
+                <p className={`text-sm font-bold ${colors.accent}`}>{result.aimNote}</p>
+              </div>
+              <div className="border-t border-gray-700 pt-4">
+                <div className={`text-xs uppercase tracking-widest mb-1 ${colors.accent}`}>💡 Tips</div>
+                <ul className="text-sm text-gray-200 leading-relaxed list-disc list-inside space-y-1">
+                  {result.tips.map((tip, index) => (
+                    <li key={index}>{tip}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          );
+        })}
+        {results.length === 0 && (
+          <div className="rounded-lg border border-gray-700 bg-gray-900 p-5 text-center">
+            <p className="text-sm text-gray-400">No reference data found for the selected condition.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -150,6 +150,8 @@ const SHOT_CONFIG = [
   },
 ];
 
+const RELEASE_ANGLE_FALLBACK = ["hyzer", "flat", "anhyzer"];
+
 const WIND_ID_TO_SOURCE = Object.fromEntries(
   WIND_CONFIG.map((entry) => [entry.id, entry.sourceKey])
 );
@@ -161,26 +163,6 @@ const TERRAIN_ID_TO_SOURCE = Object.fromEntries(
 const SHOT_ID_TO_SOURCE = Object.fromEntries(
   SHOT_CONFIG.map((entry) => [entry.id, entry.sourceKey])
 );
-
-const RELEASE_ANGLE_OPTIONS = recommendationsSource?.dimensions?.releaseAngle || [
-  "hyzer",
-  "flat",
-  "anhyzer",
-];
-
-const SOURCE_DIMENSIONS = {
-  wind: new Set(recommendationsSource?.dimensions?.wind || []),
-  terrain: new Set(recommendationsSource?.dimensions?.terrain || []),
-  shot: new Set(recommendationsSource?.dimensions?.shot || []),
-  releaseAngle: new Set(RELEASE_ANGLE_OPTIONS),
-  discProfiles: new Set(recommendationsSource?.dimensions?.discProfiles || []),
-};
-
-const ENTRIES = Array.isArray(recommendationsSource?.entries)
-  ? recommendationsSource.entries
-  : [];
-
-const ENTRIES_WITH_INDEX = ENTRIES.map((entry, index) => ({ entry, index }));
 
 const DISC_ORDER = {
   understable: 0,
@@ -216,18 +198,366 @@ export const SHOT_SHAPES = SHOT_CONFIG.map(({ id, label, icon, desc }) => ({
 }));
 
 export const windGuideMeta = recommendationsSource?.meta || {};
-export const referenceMeta = {
-  windKeys: WIND_CONFIG.map((item) => item.id),
-  terrainKeys: TERRAIN_CONFIG.map((item) => item.id),
-  shotKeys: SHOT_CONFIG.map((item) => item.id),
-  releaseAngles: RELEASE_ANGLE_OPTIONS,
-  discProfiles: Array.from(SOURCE_DIMENSIONS.discProfiles),
-};
 
 function throwAppError(functionName, userMessage, debugContext) {
   const err = new AppError(userMessage, debugContext);
   console.error(`[${functionName}]`, err);
   throw err;
+}
+
+function ensureArray(functionName, value, name) {
+  if (!Array.isArray(value)) {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `${name} must be an array`
+    );
+  }
+
+  return value;
+}
+
+function ensureString(functionName, value, name) {
+  if (typeof value !== "string" || value.trim() === "") {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `${name} must be a non-empty string`
+    );
+  }
+
+  return value;
+}
+
+function ensureTipsArray(functionName, value, name) {
+  const tips = ensureArray(functionName, value, name);
+  for (const tip of tips) {
+    ensureString(functionName, tip, `${name} tip`);
+  }
+  return tips;
+}
+
+function parseSingleSuggestedValue(functionName, suggestedFor, dimension, context) {
+  const dimensionValues = suggestedFor?.[dimension];
+  if (!Array.isArray(dimensionValues) || dimensionValues.length !== 1) {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `${context} suggestedFor.${dimension} must contain exactly one value`
+    );
+  }
+
+  return ensureString(
+    functionName,
+    dimensionValues[0],
+    `${context} suggestedFor.${dimension}[0]`
+  );
+}
+
+function validateFactorSupportValue(functionName, payload, context) {
+  if (!payload || typeof payload !== "object") {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `Missing factor support payload for ${context}`
+    );
+  }
+
+  return {
+    explanation: ensureString(
+      functionName,
+      payload.explanation,
+      `${context} explanation`
+    ),
+    tip: ensureString(functionName, payload.tip, `${context} tip`),
+  };
+}
+
+function validateNormalizedSource(functionName, sourceData) {
+  const dimensions = sourceData?.dimensions || {};
+  const wind = ensureArray(functionName, dimensions.wind, "dimensions.wind");
+  const terrain = ensureArray(
+    functionName,
+    dimensions.terrain,
+    "dimensions.terrain"
+  );
+  const shot = ensureArray(functionName, dimensions.shot, "dimensions.shot");
+  const releaseAngle = ensureArray(
+    functionName,
+    dimensions.releaseAngle || RELEASE_ANGLE_FALLBACK,
+    "dimensions.releaseAngle"
+  );
+  const discProfiles = ensureArray(
+    functionName,
+    dimensions.discProfiles,
+    "dimensions.discProfiles"
+  );
+
+  const profiles = ensureArray(functionName, sourceData?.profiles, "profiles");
+  const factorSupport = sourceData?.factorSupport;
+  if (!factorSupport || typeof factorSupport !== "object") {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      "factorSupport must be an object"
+    );
+  }
+
+  const conditions = ensureArray(
+    functionName,
+    sourceData?.conditions,
+    "conditions"
+  );
+
+  if (profiles.length !== discProfiles.length) {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `profiles length (${profiles.length}) does not match dimensions.discProfiles (${discProfiles.length})`
+    );
+  }
+
+  return {
+    dimensions: { wind, terrain, shot, releaseAngle, discProfiles },
+    profiles,
+    factorSupport,
+    conditions,
+  };
+}
+
+const NORMALIZED_SOURCE = validateNormalizedSource(
+  "validateNormalizedSource",
+  recommendationsSource
+);
+
+const RELEASE_ANGLE_OPTIONS = NORMALIZED_SOURCE.dimensions.releaseAngle;
+
+const SOURCE_DIMENSIONS = {
+  wind: new Set(NORMALIZED_SOURCE.dimensions.wind),
+  terrain: new Set(NORMALIZED_SOURCE.dimensions.terrain),
+  shot: new Set(NORMALIZED_SOURCE.dimensions.shot),
+  releaseAngle: new Set(RELEASE_ANGLE_OPTIONS),
+  discProfiles: new Set(NORMALIZED_SOURCE.dimensions.discProfiles),
+};
+
+const PROFILE_BY_ID = new Map();
+const PROFILES = [];
+for (const profile of NORMALIZED_SOURCE.profiles) {
+  const profileId = ensureString(
+    "loadProfiles",
+    profile?.profileId,
+    "profile.profileId"
+  );
+  const disc = ensureString("loadProfiles", profile?.disc, `${profileId}.disc`);
+  const category = ensureString(
+    "loadProfiles",
+    profile?.category,
+    `${profileId}.category`
+  );
+  const baseExplanation = ensureString(
+    "loadProfiles",
+    profile?.baseExplanation,
+    `${profileId}.baseExplanation`
+  );
+  const baseTips = ensureTipsArray(
+    "loadProfiles",
+    profile?.baseTips,
+    `${profileId}.baseTips`
+  );
+
+  if (PROFILE_BY_ID.has(profileId)) {
+    throwAppError(
+      "loadProfiles",
+      "Could not read recommendation data. Check your selected conditions.",
+      `Duplicate profileId ${profileId}`
+    );
+  }
+
+  PROFILE_BY_ID.set(profileId, {
+    profileId,
+    disc,
+    category,
+    baseExplanation,
+    baseTips,
+  });
+}
+
+for (const profileId of NORMALIZED_SOURCE.dimensions.discProfiles) {
+  if (!PROFILE_BY_ID.has(profileId)) {
+    throwAppError(
+      "loadProfiles",
+      "Could not read recommendation data. Check your selected conditions.",
+      `Missing profile ${profileId}`
+    );
+  }
+
+  PROFILES.push(PROFILE_BY_ID.get(profileId));
+}
+
+const FACTOR_SUPPORT = {
+  wind: {},
+  terrain: {},
+  shot: {},
+  releaseAngle: {},
+};
+
+for (const dimension of ["wind", "terrain", "shot", "releaseAngle"]) {
+  const dimensionSupport = factorSupportForDimension(
+    "loadFactorSupport",
+    NORMALIZED_SOURCE.factorSupport,
+    dimension
+  );
+
+  for (const value of NORMALIZED_SOURCE.dimensions[dimension]) {
+    FACTOR_SUPPORT[dimension][value] = validateFactorSupportValue(
+      "loadFactorSupport",
+      dimensionSupport[value],
+      `${dimension}.${value}`
+    );
+  }
+}
+
+const CONDITION_BY_KEY = new Map();
+const CONDITIONS = [];
+for (const condition of NORMALIZED_SOURCE.conditions) {
+  const conditionId = ensureString(
+    "loadConditions",
+    condition?.id,
+    "condition.id"
+  );
+  const wind = parseSingleSuggestedValue(
+    "loadConditions",
+    condition.suggestedFor,
+    "wind",
+    conditionId
+  );
+  const terrain = parseSingleSuggestedValue(
+    "loadConditions",
+    condition.suggestedFor,
+    "terrain",
+    conditionId
+  );
+  const shot = parseSingleSuggestedValue(
+    "loadConditions",
+    condition.suggestedFor,
+    "shot",
+    conditionId
+  );
+  const releaseAngle = parseSingleSuggestedValue(
+    "loadConditions",
+    condition.suggestedFor,
+    "releaseAngle",
+    conditionId
+  );
+
+  validateDimensionValue("loadConditions", "wind", wind);
+  validateDimensionValue("loadConditions", "terrain", terrain);
+  validateDimensionValue("loadConditions", "shot", shot);
+  validateDimensionValue("loadConditions", "releaseAngle", releaseAngle);
+
+  const recommendation = condition?.recommendation;
+  if (!recommendation || typeof recommendation !== "object") {
+    throwAppError(
+      "loadConditions",
+      "Could not read recommendation data. Check your selected conditions.",
+      `${conditionId} recommendation must be an object`
+    );
+  }
+
+  const normalizedRecommendation = {
+    disc: ensureString(
+      "loadConditions",
+      recommendation.disc,
+      `${conditionId}.recommendation.disc`
+    ),
+    category: ensureString(
+      "loadConditions",
+      recommendation.category,
+      `${conditionId}.recommendation.category`
+    ),
+    angle: recommendation.angle || "",
+    aimPoint: recommendation.aimPoint || "",
+    summary: recommendation.summary || "",
+    tips: ensureTipsArray(
+      "loadConditions",
+      recommendation.tips || [],
+      `${conditionId}.recommendation.tips`
+    ),
+  };
+
+  const key = buildConditionKey({ wind, terrain, shot, releaseAngle });
+  if (CONDITION_BY_KEY.has(key)) {
+    throwAppError(
+      "loadConditions",
+      "Could not read recommendation data. Check your selected conditions.",
+      `Duplicate condition key ${key}`
+    );
+  }
+
+  const normalizedCondition = {
+    id: conditionId,
+    wind,
+    terrain,
+    shot,
+    releaseAngle,
+    recommendation: normalizedRecommendation,
+  };
+
+  CONDITION_BY_KEY.set(key, normalizedCondition);
+  CONDITIONS.push(normalizedCondition);
+}
+
+for (const wind of NORMALIZED_SOURCE.dimensions.wind) {
+  for (const terrain of NORMALIZED_SOURCE.dimensions.terrain) {
+    for (const shot of NORMALIZED_SOURCE.dimensions.shot) {
+      for (const releaseAngle of NORMALIZED_SOURCE.dimensions.releaseAngle) {
+        const key = buildConditionKey({ wind, terrain, shot, releaseAngle });
+        if (!CONDITION_BY_KEY.has(key)) {
+          throwAppError(
+            "loadConditions",
+            "Could not read recommendation data. Check your selected conditions.",
+            `Missing condition for ${key}`
+          );
+        }
+      }
+    }
+  }
+}
+
+export const referenceMeta = {
+  windKeys: WIND_CONFIG.map((item) => item.id),
+  terrainKeys: TERRAIN_CONFIG.map((item) => item.id),
+  shotKeys: SHOT_CONFIG.map((item) => item.id),
+  releaseAngles: RELEASE_ANGLE_OPTIONS,
+  discProfiles: NORMALIZED_SOURCE.dimensions.discProfiles,
+};
+
+const WIND_ORDER = Object.fromEntries(
+  WIND_DIRECTIONS.map((item, index) => [item.id, index])
+);
+
+const TERRAIN_ORDER = Object.fromEntries(
+  TERRAIN_TYPES.map((item, index) => [item.id, index])
+);
+
+const SHOT_ORDER = Object.fromEntries(
+  SHOT_SHAPES.map((item, index) => [item.id, index])
+);
+
+const RELEASE_ANGLE_ORDER = Object.fromEntries(
+  RELEASE_ANGLE_OPTIONS.map((value, index) => [value, index])
+);
+
+function factorSupportForDimension(functionName, factorSupport, dimension) {
+  const value = factorSupport?.[dimension];
+  if (!value || typeof value !== "object") {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `factorSupport.${dimension} must be an object`
+    );
+  }
+  return value;
 }
 
 function validateDimensionValue(functionName, dimension, sourceValue) {
@@ -249,6 +579,7 @@ function toSourceValue(functionName, dimension, selectedId, idToSourceMap) {
       `Unknown ${dimension} id: ${selectedId}`
     );
   }
+
   validateDimensionValue(functionName, dimension, sourceValue);
   return sourceValue;
 }
@@ -259,192 +590,231 @@ function toSourceReleaseAngle(functionName, releaseAngle) {
   return normalizedReleaseAngle;
 }
 
-function getDimensionMatchStrength(matcherValue, selectedValue) {
-  if (matcherValue === "*") {
-    return 1;
-  }
-
-  if (!Array.isArray(matcherValue) || matcherValue.length === 0) {
-    return 0;
-  }
-
-  if (!matcherValue.includes(selectedValue)) {
-    return 0;
-  }
-
-  if (matcherValue.length === 1) {
-    return 3;
-  }
-
-  return 2;
+function buildConditionKey({ wind, terrain, shot, releaseAngle }) {
+  return `${wind}|${terrain}|${shot}|${releaseAngle}`;
 }
 
-function getSpecificityScore(entry, selected) {
-  const suggestedFor = entry?.suggestedFor || {};
-  const windScore = getDimensionMatchStrength(suggestedFor.wind, selected.wind);
-  const terrainScore = getDimensionMatchStrength(
-    suggestedFor.terrain,
-    selected.terrain
-  );
-  const shotScore = getDimensionMatchStrength(suggestedFor.shot, selected.shot);
-  const releaseAngleScore = getDimensionMatchStrength(
-    suggestedFor.releaseAngle,
-    selected.releaseAngle
-  );
-
-  if (
-    windScore === 0 ||
-    terrainScore === 0 ||
-    shotScore === 0 ||
-    releaseAngleScore === 0
-  ) {
-    return null;
-  }
-
-  // Weighted lexicographic score where single-value match > multi-value set > wildcard.
-  return (
-    windScore * 1000 +
-    terrainScore * 100 +
-    shotScore * 10 +
-    releaseAngleScore
-  );
-}
-
-function selectBestEntry(functionName, selected, entriesWithIndex) {
-  let best = null;
-  let ties = [];
-
-  for (const item of entriesWithIndex) {
-    const specificityScore = getSpecificityScore(item.entry, selected);
-    if (specificityScore === null) {
-      continue;
-    }
-
-    const priority = Number(item.entry?.priority || 0);
-
-    if (
-      !best ||
-      specificityScore > best.specificityScore ||
-      (specificityScore === best.specificityScore && priority > best.priority)
-    ) {
-      best = {
-        ...item,
-        specificityScore,
-        priority,
-      };
-      ties = [best];
-      continue;
-    }
-
-    if (
-      specificityScore === best.specificityScore &&
-      priority === best.priority
-    ) {
-      ties.push({
-        ...item,
-        specificityScore,
-        priority,
-      });
-    }
-  }
-
-  if (ties.length > 1) {
-    throwAppError(
-      functionName,
-      "Could not resolve a recommendation for this condition.",
-      `Ambiguous entries with same specificity and priority: ${ties
-        .map((item) => item.entry.id)
-        .join(", ")}`
-    );
-  }
-
-  return best;
-}
-
-function normalizeRecommendation(shotId, entry) {
-  const recommendation = entry?.recommendation;
-
-  if (!recommendation?.disc || !recommendation?.category) {
-    return null;
-  }
-
-  const tips = Array.isArray(recommendation.tips) ? recommendation.tips : [];
-
+function normalizeRecommendation(shotId, condition) {
   return {
     shotId,
-    disc: recommendation.disc,
-    category: recommendation.category,
-    angle: recommendation.angle || "",
-    summary: recommendation.summary || "",
-    aimNote: recommendation.aimPoint || "",
-    tips,
-    tip: tips[0] || "",
+    disc: condition.recommendation.disc,
+    category: condition.recommendation.category,
+    angle: condition.recommendation.angle,
+    summary: condition.recommendation.summary,
+    aimNote: condition.recommendation.aimPoint,
+    tips: condition.recommendation.tips,
+    tip: condition.recommendation.tips[0] || "",
     confidence: "best",
   };
 }
 
-function getExpandedDimensionValues(dimension, matcherValue, selectedValue) {
-  if (selectedValue) {
-    return getDimensionMatchStrength(matcherValue, selectedValue) > 0
-      ? [selectedValue]
-      : [];
-  }
-
-  if (matcherValue === "*") {
-    return Array.from(SOURCE_DIMENSIONS[dimension]);
-  }
-
-  return Array.isArray(matcherValue) ? matcherValue : [];
+function sortValues(values, orderMap) {
+  return values.slice().sort((a, b) => {
+    const rankA = orderMap[a] ?? 99;
+    const rankB = orderMap[b] ?? 99;
+    return rankA - rankB;
+  });
 }
 
-function normalizeReferenceRows(entry, filter) {
-  const suggestedFor = entry?.suggestedFor || {};
-  const reference = entry?.reference;
+function createMatchedFactorSets() {
+  return {
+    wind: new Set(),
+    terrain: new Set(),
+    shot: new Set(),
+    releaseAngle: new Set(),
+  };
+}
 
-  if (!reference?.profile || !reference?.disc || !reference?.category) {
-    return [];
+function collectMatchedFactorSets(conditions) {
+  const matched = createMatchedFactorSets();
+  for (const condition of conditions) {
+    matched.wind.add(condition.wind);
+    matched.terrain.add(condition.terrain);
+    matched.shot.add(condition.shot);
+    matched.releaseAngle.add(condition.releaseAngle);
+  }
+  return matched;
+}
+
+function toFactorExplanations(dimension, matchedValues) {
+  const valueOrder =
+    dimension === "wind"
+      ? WIND_ORDER
+      : dimension === "terrain"
+      ? TERRAIN_ORDER
+      : dimension === "shot"
+      ? SHOT_ORDER
+      : RELEASE_ANGLE_ORDER;
+
+  const orderedValues = sortValues(Array.from(matchedValues), valueOrder);
+  const byText = new Map();
+
+  for (const value of orderedValues) {
+    const support = FACTOR_SUPPORT[dimension][value];
+    if (!support) {
+      throwAppError(
+        "toFactorExplanations",
+        "Could not read recommendation data. Check your selected conditions.",
+        `Missing factor support for ${dimension}.${value}`
+      );
+    }
+
+    const existing = byText.get(support.explanation);
+    if (!existing) {
+      byText.set(support.explanation, {
+        text: support.explanation,
+        matchedValues: [value],
+      });
+      continue;
+    }
+
+    existing.matchedValues.push(value);
   }
 
-  const winds = getExpandedDimensionValues("wind", suggestedFor.wind, filter.wind);
-  const terrains = getExpandedDimensionValues(
-    "terrain",
-    suggestedFor.terrain,
-    filter.terrain
-  );
-  const shots = getExpandedDimensionValues("shot", suggestedFor.shot, filter.shot);
-  const releaseAngles = getExpandedDimensionValues(
-    "releaseAngle",
-    suggestedFor.releaseAngle,
-    filter.releaseAngle
-  );
+  return Array.from(byText.values()).map((entry) => ({
+    ...entry,
+    matchedValues: sortValues(entry.matchedValues, valueOrder),
+  }));
+}
 
-  const rows = [];
-  for (const windId of winds) {
-    for (const terrainId of terrains) {
-      for (const shotId of shots) {
-        for (const releaseAngle of releaseAngles) {
-          rows.push({
-            disc: reference.disc,
-            category: reference.category,
-            profile: reference.profile,
-            explanation: reference.explanation || "",
-            tips: Array.isArray(reference.tips) ? reference.tips : [],
-            windId,
-            terrainId,
-            shotId,
-            releaseAngle,
-          });
-        }
+function getMatchedConditions(filter) {
+  return CONDITIONS.filter((condition) => {
+    if (filter.wind && condition.wind !== filter.wind) {
+      return false;
+    }
+    if (filter.terrain && condition.terrain !== filter.terrain) {
+      return false;
+    }
+    if (filter.shot && condition.shot !== filter.shot) {
+      return false;
+    }
+    if (filter.releaseAngle && condition.releaseAngle !== filter.releaseAngle) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function toFacetFilter(functionName, discType, stability) {
+  if (discType && !Object.prototype.hasOwnProperty.call(CATEGORY_ORDER, discType)) {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `Unknown discType filter: ${discType}`
+    );
+  }
+
+  if (stability && !Object.prototype.hasOwnProperty.call(DISC_ORDER, stability)) {
+    throwAppError(
+      functionName,
+      "Could not read recommendation data. Check your selected conditions.",
+      `Unknown stability filter: ${stability}`
+    );
+  }
+
+  return {
+    discType: discType || null,
+    stability: stability || null,
+  };
+}
+
+function toDimensionFilter(functionName, params) {
+  return {
+    wind: params.windId
+      ? toSourceValue(functionName, "wind", params.windId, WIND_ID_TO_SOURCE)
+      : null,
+    terrain: params.terrainId
+      ? toSourceValue(
+          functionName,
+          "terrain",
+          params.terrainId,
+          TERRAIN_ID_TO_SOURCE
+        )
+      : null,
+    shot: params.shotId
+      ? toSourceValue(functionName, "shot", params.shotId, SHOT_ID_TO_SOURCE)
+      : null,
+    releaseAngle: params.releaseAngle
+      ? toSourceReleaseAngle(functionName, params.releaseAngle)
+      : null,
+  };
+}
+
+function toSituationalSummaries(matchedConditions) {
+  const summaryMap = new Map();
+
+  for (const condition of matchedConditions) {
+    const summaryText = ensureString(
+      "toSituationalSummaries",
+      condition.recommendation.summary,
+      `${condition.id}.recommendation.summary`
+    );
+
+    const existing = summaryMap.get(summaryText);
+    if (!existing) {
+      summaryMap.set(summaryText, {
+        summary: summaryText,
+        conditionCount: 1,
+        matchedFactors: {
+          wind: new Set([condition.wind]),
+          terrain: new Set([condition.terrain]),
+          shot: new Set([condition.shot]),
+          releaseAngle: new Set([condition.releaseAngle]),
+        },
+      });
+      continue;
+    }
+
+    existing.conditionCount += 1;
+    existing.matchedFactors.wind.add(condition.wind);
+    existing.matchedFactors.terrain.add(condition.terrain);
+    existing.matchedFactors.shot.add(condition.shot);
+    existing.matchedFactors.releaseAngle.add(condition.releaseAngle);
+  }
+
+  return Array.from(summaryMap.values())
+    .map((entry) => ({
+      summary: entry.summary,
+      conditionCount: entry.conditionCount,
+      matchedFactors: {
+        wind: sortValues(Array.from(entry.matchedFactors.wind), WIND_ORDER),
+        terrain: sortValues(
+          Array.from(entry.matchedFactors.terrain),
+          TERRAIN_ORDER
+        ),
+        shot: sortValues(Array.from(entry.matchedFactors.shot), SHOT_ORDER),
+        releaseAngle: sortValues(
+          Array.from(entry.matchedFactors.releaseAngle),
+          RELEASE_ANGLE_ORDER
+        ),
+      },
+    }))
+    .sort((a, b) => {
+      if (b.conditionCount !== a.conditionCount) {
+        return b.conditionCount - a.conditionCount;
       }
+      return a.summary.localeCompare(b.summary);
+    });
+}
+
+function toCardTips(profile, matchedFactorSets) {
+  const tips = new Set(profile.baseTips);
+
+  for (const dimension of ["wind", "terrain", "shot", "releaseAngle"]) {
+    for (const value of matchedFactorSets[dimension]) {
+      const support = FACTOR_SUPPORT[dimension][value];
+      if (!support) {
+        throwAppError(
+          "toCardTips",
+          "Could not read recommendation data. Check your selected conditions.",
+          `Missing factor support for ${dimension}.${value}`
+        );
+      }
+      tips.add(support.tip);
     }
   }
 
-  return rows;
-}
-
-function sourceToId(map, sourceValue) {
-  const found = Object.entries(map).find(([, source]) => source === sourceValue);
-  return found ? found[0] : sourceValue;
+  return Array.from(tips);
 }
 
 /**
@@ -474,18 +844,19 @@ export function getRecommendation({
   const shot = toSourceValue(functionName, "shot", shotId, SHOT_ID_TO_SOURCE);
   const selectedReleaseAngle = toSourceReleaseAngle(functionName, releaseAngle);
 
-  const best = selectBestEntry(
-    functionName,
-    {
-      wind,
-      terrain,
-      shot,
-      releaseAngle: selectedReleaseAngle,
-    },
-    ENTRIES_WITH_INDEX
-  );
+  const key = buildConditionKey({
+    wind,
+    terrain,
+    shot,
+    releaseAngle: selectedReleaseAngle,
+  });
 
-  return best ? normalizeRecommendation(shotId, best.entry) : null;
+  const condition = CONDITION_BY_KEY.get(key);
+  if (!condition) {
+    return null;
+  }
+
+  return normalizeRecommendation(shotId, condition);
 }
 
 /**
@@ -513,116 +884,73 @@ export function getRecommendationsForCondition({
 }
 
 /**
- * Get compiled reference entries filtered by any combination of factors.
+ * Get reference cards assembled from normalized profiles, factor support, and matched conditions.
  *
  * @param {object} params Query parameters.
  * @param {string | null} [params.windId=null] Optional wind id from WIND_DIRECTIONS.
  * @param {string | null} [params.terrainId=null] Optional terrain id from TERRAIN_TYPES.
  * @param {string | null} [params.shotId=null] Optional shot shape id from SHOT_SHAPES.
  * @param {string | null} [params.releaseAngle=null] Optional release angle: 'hyzer' | 'flat' | 'anhyzer'.
- * @returns {object[]} Filtered reference entries.
+ * @param {string | null} [params.discType=null] Optional disc type/category: 'driver' | 'mid' | 'putter'.
+ * @param {string | null} [params.stability=null] Optional stability: 'understable' | 'stable' | 'overstable'.
+ * @returns {object[]} Reference cards for the selected conditions.
  */
-export function getFilteredRecommendations({
+export function getReferenceCardsForCondition({
   windId = null,
   terrainId = null,
   shotId = null,
   releaseAngle = null,
+  discType = null,
+  stability = null,
 }) {
-  const functionName = "getFilteredRecommendations";
-  const selectedFilter = {
-    wind: windId
-      ? toSourceValue(functionName, "wind", windId, WIND_ID_TO_SOURCE)
-      : null,
-    terrain: terrainId
-      ? toSourceValue(functionName, "terrain", terrainId, TERRAIN_ID_TO_SOURCE)
-      : null,
-    shot: shotId
-      ? toSourceValue(functionName, "shot", shotId, SHOT_ID_TO_SOURCE)
-      : null,
-    releaseAngle: releaseAngle
-      ? toSourceReleaseAngle(functionName, releaseAngle)
-      : null,
-  };
-
-  const rows = [];
-
-  for (const { entry } of ENTRIES_WITH_INDEX) {
-    const normalizedRows = normalizeReferenceRows(entry, selectedFilter);
-    for (const row of normalizedRows) {
-      rows.push({
-        ...row,
-        windId: sourceToId(WIND_ID_TO_SOURCE, row.windId),
-        terrainId: sourceToId(TERRAIN_ID_TO_SOURCE, row.terrainId),
-        shotId: sourceToId(SHOT_ID_TO_SOURCE, row.shotId),
-      });
-    }
-  }
-
-  return rows;
-}
-
-/**
- * Get unique disc types for the selected filter set with grouped explanations.
- *
- * @param {object} params Query parameters.
- * @param {string | null} [params.windId=null] Optional wind id from WIND_DIRECTIONS.
- * @param {string | null} [params.terrainId=null] Optional terrain id from TERRAIN_TYPES.
- * @param {string | null} [params.shotId=null] Optional shot shape id from SHOT_SHAPES.
- * @param {string | null} [params.releaseAngle=null] Optional release angle: 'hyzer' | 'flat' | 'anhyzer'.
- * @returns {object[]} Unique disc types for the selected filters.
- */
-export function getDiscTypesForCondition({
-  windId = null,
-  terrainId = null,
-  shotId = null,
-  releaseAngle = null,
-}) {
-  const filteredRecommendations = getFilteredRecommendations({
+  const functionName = "getReferenceCardsForCondition";
+  const selectedFilter = toDimensionFilter(functionName, {
     windId,
     terrainId,
     shotId,
     releaseAngle,
   });
+  const facetFilter = toFacetFilter(functionName, discType, stability);
+  const matchedConditions = getMatchedConditions(selectedFilter);
 
-  const typeMap = new Map();
-
-  for (const result of filteredRecommendations) {
-    const key = `${result.disc}|${result.category}`;
-    const existing = typeMap.get(key);
-
-    if (!existing) {
-      typeMap.set(key, {
-        disc: result.disc,
-        category: result.category,
-        explanations: new Set([result.explanation]),
-        tips: new Set(Array.isArray(result.tips) ? result.tips : []),
-      });
-      continue;
-    }
-
-    existing.explanations.add(result.explanation);
-    for (const tip of result.tips || []) {
-      existing.tips.add(tip);
-    }
+  if (matchedConditions.length === 0) {
+    return [];
   }
 
-  const grouped = Array.from(typeMap.values()).map((entry) => {
-    const explanations = Array.from(entry.explanations);
-    const tips = Array.from(entry.tips);
+  const matchedFactorSets = collectMatchedFactorSets(matchedConditions);
 
-    return {
-      disc: entry.disc,
-      category: entry.category,
-      explanations: explanations.slice(0, 6),
-      explanationOverflowCount: Math.max(explanations.length - 6, 0),
-      tips: tips.slice(0, 6),
-      tipsOverflowCount: Math.max(tips.length - 6, 0),
-    };
-  });
+  const cards = PROFILES.filter((profile) => {
+    if (facetFilter.discType && profile.category !== facetFilter.discType) {
+      return false;
+    }
 
-  grouped.sort((a, b) => {
+    if (facetFilter.stability && profile.disc !== facetFilter.stability) {
+      return false;
+    }
+
+    return true;
+  }).map((profile) => ({
+    profileId: profile.profileId,
+    disc: profile.disc,
+    category: profile.category,
+    baseExplanation: profile.baseExplanation,
+    factorExplanations: {
+      wind: toFactorExplanations("wind", matchedFactorSets.wind),
+      terrain: toFactorExplanations("terrain", matchedFactorSets.terrain),
+      shot: toFactorExplanations("shot", matchedFactorSets.shot),
+      releaseAngle: toFactorExplanations(
+        "releaseAngle",
+        matchedFactorSets.releaseAngle
+      ),
+    },
+    tips: toCardTips(profile, matchedFactorSets),
+    situationalSummaries: toSituationalSummaries(matchedConditions),
+  }));
+
+  cards.sort((a, b) => {
     const categoryDelta =
       (CATEGORY_ORDER[a.category] ?? 99) - (CATEGORY_ORDER[b.category] ?? 99);
+
     if (categoryDelta !== 0) {
       return categoryDelta;
     }
@@ -630,14 +958,12 @@ export function getDiscTypesForCondition({
     return (DISC_ORDER[a.disc] ?? 99) - (DISC_ORDER[b.disc] ?? 99);
   });
 
-  return grouped;
+  return cards;
 }
 
 /**
- * Internal matcher helpers exposed for unit testing.
+ * Internal helper utilities exposed for unit testing.
  */
-export const __matcherInternals = {
-  getDimensionMatchStrength,
-  getSpecificityScore,
-  selectBestEntry,
+export const __referenceInternals = {
+  validateNormalizedSource,
 };

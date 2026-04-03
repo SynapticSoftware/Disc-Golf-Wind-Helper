@@ -5,12 +5,14 @@ export default function SuggesterTab() {
   const [selectedShot, setSelectedShot] = useState(null);
   const [selectedTerrain, setSelectedTerrain] = useState(null);
   const [selectedWind, setSelectedWind] = useState(null);
+  const windOptions = WIND_DIRECTIONS.filter((wind) => wind.id !== 'no_wind');
+  const effectiveWind = selectedWind || 'no_wind';
 
-  const selectedRecommendation = selectedShot && selectedTerrain && selectedWind
+  const selectedRecommendation = selectedShot && selectedTerrain
     ? getRecommendation({
       shotId: selectedShot,
       terrainId: selectedTerrain,
-      windId: selectedWind,
+      windId: effectiveWind,
     })
     : null;
 
@@ -58,9 +60,9 @@ export default function SuggesterTab() {
 
       {/* Wind */}
       <div className="mb-6">
-        <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">3. What's the wind doing?</div>
+        <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">3. What's the wind doing? (Optional)</div>
         <div className="grid grid-cols-4 gap-2">
-          {WIND_DIRECTIONS.map((wind) => (
+          {windOptions.map((wind) => (
             <button key={wind.id} onClick={() => setSelectedWind(prev => prev === wind.id ? null : wind.id)}
               aria-label={`Select wind ${wind.label}`}
               className={`py-3 px-2 rounded border text-center transition-all flex flex-col items-center justify-center gap-1 ${
@@ -76,7 +78,7 @@ export default function SuggesterTab() {
       </div>
 
       {/* Results */}
-      {selectedShot && selectedWind && (
+      {selectedShot && selectedTerrain && (
         <div>
           {results && results.length > 0 ? (
             <div className="space-y-3">
@@ -129,10 +131,6 @@ export default function SuggesterTab() {
 
       {selectedShot && !selectedTerrain && (
         <div className="text-center text-gray-600 text-sm mt-4">Select terrain to continue.</div>
-      )}
-
-      {selectedShot && selectedTerrain && !selectedWind && (
-        <div className="text-center text-gray-600 text-sm mt-4">Select a wind direction to get disc recommendations.</div>
       )}
     </div>
   );

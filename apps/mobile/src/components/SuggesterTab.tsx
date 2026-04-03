@@ -6,12 +6,14 @@ export default function SuggesterTab() {
   const [selectedShot, setSelectedShot] = useState<string | null>(null);
   const [selectedTerrain, setSelectedTerrain] = useState<string | null>(null);
   const [selectedWind, setSelectedWind] = useState<string | null>(null);
+  const windOptions = WIND_DIRECTIONS.filter((wind) => wind.id !== 'no_wind');
+  const effectiveWind = selectedWind || 'no_wind';
 
-  const selectedRecommendation = selectedShot && selectedTerrain && selectedWind
+  const selectedRecommendation = selectedShot && selectedTerrain
     ? getRecommendation({
       shotId: selectedShot,
       terrainId: selectedTerrain,
-      windId: selectedWind,
+      windId: effectiveWind,
     })
     : null;
 
@@ -66,9 +68,9 @@ export default function SuggesterTab() {
       </View>
 
       {/* Wind */}
-      <Text className="text-xs text-gray-500 uppercase tracking-widest mb-2">3. What's the wind doing?</Text>
+      <Text className="text-xs text-gray-500 uppercase tracking-widest mb-2">3. What's the wind doing? (Optional)</Text>
       <View className="flex-row flex-wrap gap-2 mb-6">
-        {WIND_DIRECTIONS.map((wind) => {
+        {windOptions.map((wind) => {
           const active = selectedWind === wind.id;
           return (
             <Pressable
@@ -89,7 +91,7 @@ export default function SuggesterTab() {
       </View>
 
       {/* Results */}
-      {selectedShot && selectedWind && (
+      {selectedShot && selectedTerrain && (
         <View>
           {results && results.length > 0 ? (
             <View className="gap-3">
@@ -145,12 +147,6 @@ export default function SuggesterTab() {
       {selectedShot && !selectedTerrain && (
         <Text className="text-center text-gray-600 text-sm mt-4">
           Select terrain to continue.
-        </Text>
-      )}
-
-      {selectedShot && selectedTerrain && !selectedWind && (
-        <Text className="text-center text-gray-600 text-sm mt-4">
-          Select a wind direction to get disc recommendations.
         </Text>
       )}
     </View>

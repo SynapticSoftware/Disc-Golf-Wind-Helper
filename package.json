@@ -5,8 +5,7 @@
     "dev:web": "turbo run dev --filter=@frisbee-wind/web",
     "dev:mobile": "turbo run start --filter=@frisbee-wind/mobile",
     "build": "turbo run build",
-    "build:web": "turbo run build --filter=@frisbee-wind/web",
-    "build:reference-data": "pnpm --filter @frisbee-wind/core run build:reference-data"
+    "build:web": "turbo run build --filter=@frisbee-wind/web"
   },
   "devDependencies": {
     "turbo": "^2.9.3"

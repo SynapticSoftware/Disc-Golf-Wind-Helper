@@ -1,8 +1,9 @@
 {
   "name": "@frisbee-wind/core",
   "version": "0.0.1",
+  "type": "module",
   "scripts": {
-    "build:reference-data": "node scripts/build-reference-data.mjs"
+    "test": "node --test test/**/*.test.mjs"
   },
   "exports": {
     ".": "./src/index.js"

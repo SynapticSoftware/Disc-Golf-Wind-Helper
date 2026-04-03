@@ -1,14 +1,20 @@
 import { useState } from 'react';
-import { WIND_DIRECTIONS, SHOT_SHAPES, TERRAIN_TYPES, suggestions, discColors } from '@frisbee-wind/core';
+import { WIND_DIRECTIONS, SHOT_SHAPES, TERRAIN_TYPES, getRecommendation, discColors } from '@frisbee-wind/core';
 
 export default function SuggesterTab() {
   const [selectedShot, setSelectedShot] = useState(null);
   const [selectedTerrain, setSelectedTerrain] = useState(null);
   const [selectedWind, setSelectedWind] = useState(null);
 
-  const results = selectedShot && selectedTerrain && selectedWind
-    ? (suggestions[selectedShot]?.[selectedWind]?.[selectedTerrain] || [])
+  const selectedRecommendation = selectedShot && selectedTerrain && selectedWind
+    ? getRecommendation({
+      shotId: selectedShot,
+      terrainId: selectedTerrain,
+      windId: selectedWind,
+    })
     : null;
+
+  const results = selectedRecommendation ? [selectedRecommendation] : [];
 
   return (
     <div>
@@ -74,9 +80,7 @@ export default function SuggesterTab() {
         <div>
           {results && results.length > 0 ? (
             <div className="space-y-3">
-              <div className="text-xs text-gray-500 uppercase tracking-widest mb-3">
-                {results.length === 1 ? 'Recommendation' : 'Options — ranked best first'}
-              </div>
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-3">Recommendation</div>
               {results.map((r, i) => {
                 const c = discColors[r.disc] || discColors.stable;
                 return (

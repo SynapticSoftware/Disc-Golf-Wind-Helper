@@ -79,27 +79,23 @@ lift to context only when 2+ components need it.
 - Mobile dev: `pnpm dev:mobile`
 - Build all: `pnpm build`
 - Build web only: `pnpm build:web`
-- Rebuild generated reference data: `pnpm build:reference-data`
+- Core tests: `pnpm --filter @frisbee-wind/core test`
 
 ### Data Pipeline Contract
-- Build script: `packages/core/scripts/build-reference-data.mjs`
-- Generated artifacts in `packages/core/data`:
-  - `suggestions.json`
-  - `wind-guide-meta.json`
-  - `reference-compiled.json`
-- Supporting authored inputs in `packages/core/data`:
-  - `reference-base.json`
-  - `reference-modifiers.json`
-  - `reference-overrides.json`
-- If an agent changes any of the above authored data inputs, it must run `pnpm build:reference-data` in the same task.
+- Canonical authored source: `packages/core/data/recommendations.json`
+- `recommendations.json` is the single source of truth for both suggester and reference flows.
+- There is no generation step for core recommendation data.
+- If an agent changes recommendation data, it must run `pnpm --filter @frisbee-wind/core test` in the same task.
 
 ### Shared Core API Boundary
 - Import shared selectors/config from `@frisbee-wind/core`.
 - Current key exports used by clients include:
   - `WIND_DIRECTIONS`, `TERRAIN_TYPES`, `SHOT_SHAPES`
-  - `suggestions`
   - `getRecommendation`, `getRecommendationsForCondition`
   - `getFilteredRecommendations`, `getDiscTypesForCondition`
+  - `AppError`
+- Do not add new direct data-object exports for UI consumption (for example, nested suggestions matrices).
+- Prefer selector-first access patterns from app surfaces.
 - Keep all new cross-platform recommendation logic inside `packages/core/src`.
 
 ### Platform Responsibilities
@@ -134,7 +130,7 @@ lift to context only when 2+ components need it.
 - No unused imports/exports/files introduced.
 - Accessibility preserved for all new interactive controls (keyboard + aria labels on web).
 - Build/test command relevant to changed package has been run, or explicit note provided if execution was not possible.
-- If data inputs changed, `pnpm build:reference-data` was run and generated outputs were committed consistently.
+- If recommendation data changed, `pnpm --filter @frisbee-wind/core test` was run and passed.
 
 ### PR/Commit Notes for Agents
 - Include:

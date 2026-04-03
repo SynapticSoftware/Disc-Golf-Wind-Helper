@@ -1,15 +1,21 @@
 import { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { WIND_DIRECTIONS, SHOT_SHAPES, TERRAIN_TYPES, suggestions, discColors } from '@frisbee-wind/core';
+import { WIND_DIRECTIONS, SHOT_SHAPES, TERRAIN_TYPES, getRecommendation, discColors } from '@frisbee-wind/core';
 
 export default function SuggesterTab() {
   const [selectedShot, setSelectedShot] = useState<string | null>(null);
   const [selectedTerrain, setSelectedTerrain] = useState<string | null>(null);
   const [selectedWind, setSelectedWind] = useState<string | null>(null);
 
-  const results = selectedShot && selectedTerrain && selectedWind
-    ? (suggestions[selectedShot]?.[selectedWind]?.[selectedTerrain] || [])
+  const selectedRecommendation = selectedShot && selectedTerrain && selectedWind
+    ? getRecommendation({
+      shotId: selectedShot,
+      terrainId: selectedTerrain,
+      windId: selectedWind,
+    })
     : null;
+
+  const results = selectedRecommendation ? [selectedRecommendation] : [];
 
   return (
     <View>
@@ -87,9 +93,7 @@ export default function SuggesterTab() {
         <View>
           {results && results.length > 0 ? (
             <View className="gap-3">
-              <Text className="text-xs text-gray-500 uppercase tracking-widest mb-1">
-                {results.length === 1 ? 'Recommendation' : 'Options — ranked best first'}
-              </Text>
+              <Text className="text-xs text-gray-500 uppercase tracking-widest mb-1">Recommendation</Text>
               {results.map((r: any, i: number) => {
                 const c = discColors[r.disc] || discColors.stable;
                 return (

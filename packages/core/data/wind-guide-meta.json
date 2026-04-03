@@ -1,0 +1,30 @@
+{
+  "perspective": "RHBH (Right-Hand Backhand)",
+  "note": "All flight paths described from RHBH perspective. LHBH and forehand players should mirror left/right references.",
+  "version": "1.0",
+  "stability_key": {
+    "overstable": "High fade rating. Resists turning in wind. Reliable and predictable in adverse conditions.",
+    "stable": "Neutral. Flies the way you throw it. Most predictable in calm conditions.",
+    "understable": "Turns right before fading left (RHBH). Great for distance and flex shots but risky in headwinds."
+  },
+  "angle_key": {
+    "hyzer": "Throwing-side edge lower at release. Promotes left finish (RHBH). More wind-resistant.",
+    "flat": "Level at release. Neutral flight path.",
+    "anhyzer": "Throwing-side edge higher at release. Promotes right turn. Risky in headwinds."
+  },
+  "disc_categories": {
+    "driver": "Max distance. Needs higher arm speed to fly correctly. Most affected by wind.",
+    "mid": "Moderate distance. Easier to control. Good for accuracy shots.",
+    "putter": "Shortest range. Most accurate. Excellent for short shots and putting."
+  },
+  "shot_shapes": {
+    "straight": "Disc travels directly toward target with minimal left/right deviation.",
+    "short_left": "Disc finishes left of the line within short-to-mid range.",
+    "short_right": "Disc finishes right of the line within short-to-mid range.",
+    "long_left": "Disc carries full distance and finishes far left.",
+    "long_right": "Disc carries full distance and finishes far right.",
+    "s_curve": "Disc turns right early in flight then fades left at the end.",
+    "distance": "Maximum controlled distance throw.",
+    "putting": "Short-range putt to the basket."
+  }
+}

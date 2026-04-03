@@ -1,6 +1,9 @@
 {
   "name": "@frisbee-wind/core",
   "version": "0.0.1",
+  "scripts": {
+    "build:reference-data": "node scripts/build-reference-data.mjs"
+  },
   "exports": {
     ".": "./src/index.js"
   },

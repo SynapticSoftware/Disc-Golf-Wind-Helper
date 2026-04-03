@@ -1,0 +1,148 @@
+{
+  "wind": {
+    "no_wind": {
+      "explanation": "In calm air, flight reflects release and disc stability with minimal external correction.",
+      "tips": [
+        "Use this condition to prioritize form and angle control."
+      ]
+    },
+    "headwind": {
+      "explanation": "Headwind increases effective turn and magnifies misses in release angle and speed.",
+      "tips": [
+        "Move to more stable options or add hyzer when needed."
+      ]
+    },
+    "tailwind": {
+      "explanation": "Tailwind reduces effective turn and can delay movement until late flight.",
+      "tips": [
+        "Use cleaner timing and avoid overpowering."
+      ]
+    },
+    "right_to_left": {
+      "explanation": "Right-to-left crosswind adds left drift throughout flight.",
+      "tips": [
+        "Plan an aim offset to the right."
+      ]
+    },
+    "left_to_right": {
+      "explanation": "Left-to-right crosswind adds right drift throughout flight.",
+      "tips": [
+        "Plan an aim offset to the left."
+      ]
+    },
+    "headwind_right_to_left": {
+      "explanation": "Headwind plus right-to-left combines added turn pressure with leftward drift.",
+      "tips": [
+        "Favor stable control lines and larger aim compensation."
+      ]
+    },
+    "headwind_left_to_right": {
+      "explanation": "Headwind plus left-to-right combines added turn pressure with rightward drift.",
+      "tips": [
+        "Choose controlled power and cleaner release angle."
+      ]
+    },
+    "tailwind_right_to_left": {
+      "explanation": "Tailwind plus right-to-left extends carry while pushing the disc left.",
+      "tips": [
+        "Use placement-first power and clear landing zone planning."
+      ]
+    },
+    "tailwind_left_to_right": {
+      "explanation": "Tailwind plus left-to-right extends carry while pushing the disc right.",
+      "tips": [
+        "Keep throw smooth and match aim to expected drift."
+      ]
+    }
+  },
+  "terrain": {
+    "uphill": {
+      "explanation": "Uphill throws lose forward speed and require stronger commitment to hold intended flight.",
+      "tips": [
+        "Add controlled power to maintain line through the climb."
+      ]
+    },
+    "flat": {
+      "explanation": "Flat ground keeps carry and finish closest to the intended release profile.",
+      "tips": [
+        "Treat flat conditions as baseline calibration."
+      ]
+    },
+    "downhill": {
+      "explanation": "Downhill throws carry farther and can exaggerate late movement and skip risk.",
+      "tips": [
+        "Use less power and prioritize landing control."
+      ]
+    }
+  },
+  "shot": {
+    "straight": {
+      "explanation": "Straight lines require balanced turn and fade with minimal lateral drift.",
+      "tips": [
+        "Pick profiles that hold center line the longest."
+      ]
+    },
+    "short_left": {
+      "explanation": "Short-left lines prioritize dependable fade at controlled speed.",
+      "tips": [
+        "Choose profiles with reliable finish over raw distance."
+      ]
+    },
+    "short_right": {
+      "explanation": "Short-right lines need controlled right movement without late over-fade.",
+      "tips": [
+        "Favor touch and angle discipline over speed."
+      ]
+    },
+    "long_left": {
+      "explanation": "Long-left lines balance carry first, then strong finish.",
+      "tips": [
+        "Aim to keep glide before fade phase starts."
+      ]
+    },
+    "long_right": {
+      "explanation": "Long-right lines need turn that holds long enough before correction.",
+      "tips": [
+        "Protect against early fade by matching stability and angle."
+      ]
+    },
+    "s_curve": {
+      "explanation": "S-curve lines need early turn plus late recovery for full shape.",
+      "tips": [
+        "Match speed and angle so both phases appear."
+      ]
+    },
+    "distance": {
+      "explanation": "Distance lines maximize carry while controlling late movement.",
+      "tips": [
+        "Prioritize clean launch and full extension."
+      ]
+    },
+    "putting": {
+      "explanation": "Putting lines prioritize repeatability, entry angle, and finish control.",
+      "tips": [
+        "Reduce variability and commit to one release."
+      ]
+    }
+  },
+  "releaseAngle": {
+    "hyzer": {
+      "explanation": "Hyzer release biases flight toward earlier left finish and lower turn exposure.",
+      "tips": [
+        "Use hyzer to stabilize risky high-turn setups."
+      ]
+    },
+    "flat": {
+      "explanation": "Flat release keeps flight neutral and reveals the profile's natural stability behavior.",
+      "tips": [
+        "Use flat when you want the clearest read on disc behavior."
+      ]
+    },
+    "anhyzer": {
+      "explanation": "Anhyzer release increases right movement and delays left finish.",
+      "tips": [
+        "Use controlled speed to avoid unwanted burn-over."
+      ]
+    }
+  }
+}

@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "Disc Golf Wind Guide",
-    "slug": "disc-golf-wind-helper",
+    "name": "DiscSense",
+    "slug": "discsense",
     "version": "1.0.0",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "splash": {
@@ -11,13 +12,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.discgolfwindguide.app"
+      "bundleIdentifier": "com.discsense.app"
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#030712"
       },
-      "package": "com.discgolfwindguide.app"
+      "package": "com.discsense.app"
     }
   }
 }

@@ -22,8 +22,8 @@ The guide is written for people who want exact steps and plain language.
 ### Important terms (plain language)
 
 - **Package name / Bundle ID**: Your app's unique identity in each store.
-  - Android package name example: `com.discgolfwindguide.app`
-  - iOS bundle ID example: `com.discgolfwindguide.app`
+  - Android package name example: `com.discsense.app`
+  - iOS bundle ID example: `com.discsense.app`
 - **AAB**: Android App Bundle file you upload to Play Console.
 - **Archive (iOS)**: Signed iOS app build you upload from Xcode to App Store Connect.
 - **Play Console**: Google's dashboard for publishing Android apps.
@@ -137,8 +137,8 @@ Open `apps/mobile/app.json`.
 
 Current IDs in this repo:
 
-- iOS bundle identifier: `com.discgolfwindguide.app`
-- Android package: `com.discgolfwindguide.app`
+- iOS bundle identifier: `com.discsense.app`
+- Android package: `com.discsense.app`
 
 Do not change these after public release unless you intentionally want a brand-new app listing.
 
@@ -156,11 +156,11 @@ Example:
   "expo": {
     "version": "1.0.0",
     "ios": {
-      "bundleIdentifier": "com.discgolfwindguide.app",
+      "bundleIdentifier": "com.discsense.app",
       "buildNumber": "1"
     },
     "android": {
-      "package": "com.discgolfwindguide.app",
+      "package": "com.discsense.app",
       "versionCode": 1
     }
   }
@@ -438,4 +438,3 @@ Use this before each store submission:
 
 - Build for app stores:  
   https://docs.expo.dev/deploy/build-project/
-

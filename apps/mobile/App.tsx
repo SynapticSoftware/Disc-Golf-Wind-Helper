@@ -1,6 +1,6 @@
 import './global.css';
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, Pressable, SafeAreaView, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
   ALTERNATE_THROW_PERSPECTIVE,
@@ -24,9 +24,13 @@ export default function App() {
 
         {/* Header */}
         <View className="mt-4 mb-5 items-center">
-          <Text className="text-3xl mb-1">🥏</Text>
-          <Text className="text-xl font-bold tracking-widest text-white uppercase">Disc Golf Wind Guide</Text>
-          <Text className="text-xs text-gray-500 mt-1">{perspectiveLabel} throws • Wind effects vary by disc speed and arm speed</Text>
+          <Image
+            source={require('./assets/logo-letterhead.png')}
+            accessibilityLabel="DiscSense logo"
+            className="h-16 w-72"
+            resizeMode="contain"
+          />
+          <Text className="text-xs text-gray-500 mt-2 text-center">{perspectiveLabel} throws • Wind effects vary by disc speed and arm speed</Text>
           <View className="mt-3 flex-row gap-1 bg-gray-900 p-1 rounded-lg">
             {THROW_PERSPECTIVES.map((option) => (
               <Pressable

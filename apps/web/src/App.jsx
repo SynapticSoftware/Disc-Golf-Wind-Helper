@@ -19,9 +19,12 @@ export default function App() {
       <div className="max-w-3xl mx-auto">
 
         <div className="mb-5 text-center">
-          <div className="text-3xl mb-1">🥏</div>
-          <h1 className="text-xl font-bold tracking-widest text-white uppercase">Disc Golf Wind Guide</h1>
-          <p className="text-xs text-gray-500 mt-1">{perspectiveLabel} throws • Wind effects vary by disc speed and arm speed</p>
+          <img
+            src="/logo-letterhead.png"
+            alt="DiscSense logo"
+            className="mx-auto h-16 w-auto sm:h-20"
+          />
+          <p className="text-xs text-gray-500 mt-2">{perspectiveLabel} throws • Wind effects vary by disc speed and arm speed</p>
           <div className="mt-3 flex justify-center">
             <div className="inline-flex gap-1 rounded-lg bg-gray-900 p-1" role="group" aria-label="Throw perspective toggle">
               {THROW_PERSPECTIVES.map((option) => (

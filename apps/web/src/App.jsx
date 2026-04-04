@@ -10,6 +10,7 @@ import useThrowPerspective from './hooks/useThrowPerspective.js';
 export default function App() {
   const [tab, setTab] = useState('suggester');
   const { perspective, setPerspective, perspectiveError } = useThrowPerspective();
+  const logoLetterheadSrc = `${import.meta.env.BASE_URL}logo-letterhead.png`;
   const perspectiveLabel = perspective === ALTERNATE_THROW_PERSPECTIVE
     ? 'RHFH/LHBH'
     : 'RHBH/LHFH';
@@ -20,7 +21,7 @@ export default function App() {
 
         <div className="mb-5 text-center">
           <img
-            src="/logo-letterhead.png"
+            src={logoLetterheadSrc}
             alt="DiscSense logo"
             className="mx-auto h-16 w-auto sm:h-20"
           />
